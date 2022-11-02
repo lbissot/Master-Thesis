@@ -1,0 +1,51 @@
+Notes du meeting du 27/10/2022 avec Julien :
+
+- Récupérer les données en bande H2H3 en cADI :
+
+    Browse process 
+    Workflow/recipe/ird_specal_dc
+    Workflow/preset/cADI_softsorting / ird_specal_dc / production
+
+    Observations/Filter/DB_h23
+
+    Utiliser un script pour ne pas dl les tar.gz !
+    -> Garder les images residual stack pour voir s'il y a un pb.
+
+    nb : noADI ne sont pas les contrastes brutes 
+
+- Pour la magnitude de l'étoile Julien a déjà un script qui query Simbad de facon opti (d'abord check coord, puis target name, ...) https://github.com/jmilou/sparta
+
+- Fichiers SPARTA :
+
+    Ce sont des ESTIMATIONS des conditions faites par le module d'OA !!! 
+    -> Il peut y avoir des abérations !
+
+    SPH SPARTA SAMPLEDATA pour les récup :
+        Data browse :
+
+            Data/Frametype
+    
+    Sont issus du process de centering ?
+
+    Obs ID pour pouvoir les relier aux Observations
+
+    convert (pas ISF!)
+
+- ASM :
+    Ce sont des vrais valeurs mais par des capteurs qui ne sont pas exactement au même endroit que SPHERE (chgmt de hauteurs etc)
+
+- Ne pas hésiter à envoyer un mail à Julien pour demander avant de faire des script moi même, si c'est utile pour moi ca peut Être utile pour quelqu'un d'autre et ils ont un bon dev.
+
+- Check manuel DC pour les header (j'ai peut être lu le mauvais, il y a l'air d'en avoir plus d'un)
+
+- Valeur du contrast à 1 arcsec dans le header (surement utile pour vérif ce que j'ai) + Field rotation (utile pour ADI) + Efficient exposure time
+
+- SHINE survey paper pour check si les courbes que j'ai sont plausibles, reprend les valeurs types sur les 150 premieres étoiles de SPHERE
+
+- TOPCAT 
+
+- dfits
+
+- seeing = FWHM
+
+
