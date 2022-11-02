@@ -32,8 +32,6 @@
 
 Taking direct pictures of extrasolar planetary systems is an important, yet challenging goal of modern astronomy, which requires specialized instrumentation. The high-contrast imaging instrument SPHERE, installed since 2014 at the Very Large Telescope, has been collecting a wealth of data over the last eight years. An important aspect for the exploitation of the large SPHERE data base, the scheduling of future observations, and for the preparation of new instruments, is to understand how instrumental performance depends on environmental parameters such as the strength of atmospheric turbulence, the wind velocity, the duration of the observation, the pointing direction, etc. With this project, we propose to use deep learning techniques in order to study how these parameters drive the instrumental performance, in an approach similar to the one used by Xuan et al. 2018. This project will make use of first-hand access the large SPHERE data base through the SPHERE Data Center at IPAG/LAM (Grenoble/Marseille).
 
-<!-- `github_username`, `repo_name`, `twitter_handle`, `linkedin_username`, `email_client`, `email`, `project_title`, `project_description` -->
-
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
