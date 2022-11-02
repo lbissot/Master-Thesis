@@ -10,7 +10,7 @@ import os
 DEBUG = True
 
 # Path to the folder containing the sphere_dl_script
-path_data = 'C:\\Users\\ludin\\Documents\\Mémoire\\DB_creation\\'
+path_data = 'C:\\Users\\ludin\\Documents\\Master Thesis\\DB_creation\\'
 target_name = 'sphere_dl_script.sh'
 
 # List of desired files
