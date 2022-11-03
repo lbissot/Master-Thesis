@@ -11,7 +11,7 @@ DEBUG = True
 
 # Path to the folder containing the sphere_dl_script
 path_data = 'C:\\Users\\ludin\\Documents\\Master Thesis\\DB_creation\\'
-target_name = 'sphere_dl_script.sh'
+target_name = 'sphere_dl_script_contrast_curves.sh'
 
 # List of desired files
 file_name_prefix = 'ird_specal_dc-IRD_SPECAL_'
@@ -54,7 +54,7 @@ for line in lines:
             parsed_lines.append(line)       
 
 # Save the new file
-with open(os.path.join(path_data, "parsed_sphere_dl_script.sh"), 'w') as f:
+with open(os.path.join(path_data, "parsed_sphere_dl_script_contrast_curves.sh"), 'w') as f:
     if DEBUG:
         print('Writing file: {}'.format("parsed_sphere_dl_script.sh"))
 
