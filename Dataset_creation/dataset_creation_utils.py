@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-This file countains the functions used to create the database.
+This file countains the functions used to create the dataset.
 """
 
 import os
@@ -35,14 +35,17 @@ def get_folder_names(path):
     """
     Get a list of the folders names located in a given path.
     """
+
     folder_names = []
     for folder in os.listdir(path):
+
         if os.path.isdir(os.path.join(path, folder)):
             folder_names.append(folder)
+            
     return folder_names
 
 
-def get_df_with_headers(path, header_list=[]):
+def get_df_with_headers(path, header_list=[], filename='ird_specal_dc-IRD_SPECAL_CONTRAST_CURVE_TABLE-contrast_curve_tab.fits'):
     """
     Get a dataframe with the separation, contrast and headers specified in the list.
     """
