@@ -10,7 +10,7 @@ import os
 DEBUG = True
 
 # Path to the folder containing the sphere_dl_script
-path_data = 'C:\\Users\\ludin\\Documents\\Master Thesis\\DB_creation\\'
+path_data = 'C:/Users/ludin/Documents/Master Thesis/Dataset_creation/Download Scripts/'
 target_name = 'sphere_dl_script_contrast_curves.sh'
 
 # List of desired files
