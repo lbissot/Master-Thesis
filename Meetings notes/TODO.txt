@@ -1,0 +1,27 @@
+--------------------------------------------------------------------------------------------------------------------------------------
+|                                                            PRIO ELEVEE                                                             |
+--------------------------------------------------------------------------------------------------------------------------------------
+
+- Ajouter magnitude de l'étoile (check script Simbad de Julien)
+
+- Faire un peu d'analyse de données pour les données numériques (plots, statistiques, etc)
+
+--------------------------------------------------------------------------------------------------------------------------------------
+|                                                            PRIO MOYENNE                                                            |
+--------------------------------------------------------------------------------------------------------------------------------------
+
+- Regarder documentation des headers et potentiellement trouver un ou deux champs en plus pour rajouter avant la réu du 18.
+
+- Regarder le site ASM pour déjà avoir une idée de comment ca marche
+
+--------------------------------------------------------------------------------------------------------------------------------------
+|                                                            PRIO FAIBLE                                                             |
+--------------------------------------------------------------------------------------------------------------------------------------
+
+- Specifier le type des colonnes du dataframe (dates, string, etc)
+
+- Commencer le rapport si rien d'autre à faire
+
+- Commencer Num Opt si rien d'autre à faire
+
+- Continuer le cours de Deep pour se rappeler et déjà avoir une idée de modèle.

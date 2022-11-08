@@ -1,0 +1,3 @@
+- Dataset constitué seulement de 514 observations, trop peu pour un modèle ?
+
+- Que rajouter comme données dans le dataset ? Ou les récupérer (headers, ASM, etc) ? Comment les utiliser ?

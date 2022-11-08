@@ -72,8 +72,8 @@ def get_df_with_headers(path, header_list=[], filename='ird_specal_dc-IRD_SPECAL
             for header in header_list:
                 data_dict[header] = fits_headers[header]
             
-            data_dict['SEPARATION'] = fits_data['SEPARATION']
-            data_dict['NSIGMA_CONTRAST'] = fits_data['NSIGMA_CONTRAST']
+            data_dict['SEPARATION'] = fits_data['SEPARATION'][2] # Combination of the two cameras (I think)
+            data_dict['NSIGMA_CONTRAST'] = fits_data['NSIGMA_CONTRAST'][2]
 
             data_dict_list.append(data_dict)
 
@@ -120,3 +120,43 @@ def write_stats_in_file(df, path, columns=['NSIGMA_CONTRAST'],filename='stats.tx
 
                 f.write(tabulate(table, headers=['' ,'mean', 'std', 'min', 'median', 'max'], tablefmt=table_format, floatfmt="g"))
                 f.write('\n\n')  
+
+
+def plot_contrast_curves(df, path):
+    """
+    Plot the contrast curves in separate files.
+    """
+
+    if not os.path.exists(path):
+        exit('ERROR! Folder {} does not exist.'.format(path))
+
+    if not path.endswith('/'):
+        path += '/'
+
+    if not os.path.exists(path + 'plots/'):
+        os.makedirs(path + 'plots/')
+        
+    path += 'plots/'
+
+    if not ('SEPARATION' in df.keys() and 'NSIGMA_CONTRAST' in df.keys() and 'OBJECT' in df.keys() and 'DATE-OBS' in df.keys(), 'ESO OBS ID' in df.keys()):
+        exit('ERROR! The dataframe must contain the columns SEPARATION, NSIGMA_CONTRAST, OBJECT, DATE-OBS and ESO OBS ID.')
+        
+    # Dataframes are not meant to access elements by index.
+    df_dict = df.to_dict()
+
+    for i in range(len(df_dict['OBJECT'])):
+        # Log transform of the contrast and warning suppression
+        with np.errstate(divide='ignore' , invalid='ignore'):
+            contrast = np.log10(df_dict['NSIGMA_CONTRAST'][i]) # There are some negative and zero values in the contrast curves, maybe process them before plotting
+
+        # Plot the contrast curve for each object and save it in separate files
+        plt.figure()
+        plt.plot(df_dict['SEPARATION'][i], contrast, label=df_dict['OBJECT'][i])
+        plt.xlabel('Separation (arcsec)')
+        plt.ylabel('Contrast (5-sigma)')
+        plt.title('Contrast curve for {} on {}'.format(df_dict['OBJECT'][i], df_dict['DATE-OBS'][i]))
+        filename = os.path.join(path, 'contrast_curve_{}.png'.format(df_dict['ESO OBS ID'][i]))
+        # print('Saving figure {}...'.format(filename))
+        plt.plot()
+        plt.savefig(filename)
+        plt.close()
