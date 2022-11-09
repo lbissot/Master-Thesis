@@ -1,3 +1,11 @@
 - Dataset constitué seulement de 514 observations, trop peu pour un modèle ?
 
+- len(separation) varient d'une observation à l'autre du coup difficile d'obtenir les statistiques (axis = 0 : pour une séparation donnée). 
+Est-ce que je peux interpoler pour avoir un seul vecteur separation pour toutes les observations ? 
+
+- En regardant les plots on remarque que les valeurs drop en approchant de 10 arcsec, il faudrait peut être considérer seulement un intervalle réduit ?
+Ca aurait aussi plus de sens physiquement car peut de chance qu'une planète soit si loin de son étoile et même si elle l'était, 
+la lumière de l'étoile n'intervient plus autant qu'à faible séparation. Aussi vu que le contraste est calculé en prenant la moyenne de plusieurs injections de planètes 
+sur un cercle dont le rayon est égal à la séparation recherchée, plus le disque est grand plus petit le contraste. -> Pas trop de sens de travailler avec ces données.
+
 - Que rajouter comme données dans le dataset ? Ou les récupérer (headers, ASM, etc) ? Comment les utiliser ?

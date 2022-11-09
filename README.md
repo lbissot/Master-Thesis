@@ -96,7 +96,7 @@ Project Link: [https://github.com/lbissot/Master-Thesis](https://github.com/lbis
 <!-- ACKNOWLEDGMENTS -->
 ## Acknowledgments
 
-* []()
+* [Julien Milli's github](https://github.com/jmilou/sparta) has been used to query Simbad.
 * []()
 * []()
 

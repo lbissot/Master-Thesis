@@ -1,10 +1,10 @@
 # Dataset Creation
 
-## About the folder
+## About this folder
 
 The goal of this folder is to build the dataset which will eventually be fed to the deep learning model. All the files found here will serve this purpose.
 
-## Folder(s)
+## Sub-Folder(s)
 
 ### `Download Scripts`
 

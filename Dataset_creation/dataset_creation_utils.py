@@ -77,6 +77,28 @@ def get_df_with_headers(path, header_list=[], filename='ird_specal_dc-IRD_SPECAL
 
             data_dict_list.append(data_dict)
 
+    df = pd.DataFrame(data_dict_list)
+
+    # Interpolate the contrast curves to have the same number of points for each observation.
+
+    # Get the number of points of the observation with the most points and use it as the number of points for all the observations.
+    # Maybe not ideal depending on the bas enumber of points in the observations ?
+    max_points = np.max(df['SEPARATION'].apply(lambda x: len(x)))
+
+    # Get the min and max separation of all the observations.
+    min_sep = np.min(df['SEPARATION'].apply(lambda x: np.min(x)))
+    max_sep = np.max(df['SEPARATION'].apply(lambda x: np.max(x)))
+
+    # Create the new separation array
+    new_sep = np.linspace(min_sep, max_sep, max_points)
+
+    # Interpolate the contrast curves
+    new_contrast = df.apply(lambda x: np.interp(new_sep, x['SEPARATION'], x['NSIGMA_CONTRAST']), axis=1)
+
+    # Replace columns in the dataframe
+    df['SEPARATION'] = new_sep
+    df['NSIGMA_CONTRAST'] = new_contrast
+
     return pd.DataFrame(data_dict_list)
 
 
@@ -151,9 +173,13 @@ def plot_contrast_curves(df, path):
 
         # Plot the contrast curve for each object and save it in separate files
         plt.figure()
-        plt.plot(df_dict['SEPARATION'][i], contrast, label=df_dict['OBJECT'][i])
+        plt.plot(df_dict['SEPARATION'][i], df_dict['NSIGMA_CONTRAST'][i], label=df_dict['OBJECT'][i])
         plt.xlabel('Separation (arcsec)')
         plt.ylabel('Contrast (5-sigma)')
+        plt.yscale(value='log')
+        # Set limits for the x and y axis
+        plt.xlim(0, 10)
+        plt.ylim(1e-7, 1e-1)
         plt.title('Contrast curve for {} on {}'.format(df_dict['OBJECT'][i], df_dict['DATE-OBS'][i]))
         filename = os.path.join(path, 'contrast_curve_{}.png'.format(df_dict['ESO OBS ID'][i]))
         # print('Saving figure {}...'.format(filename))
