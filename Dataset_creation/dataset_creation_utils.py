@@ -48,7 +48,7 @@ def get_folder_names(path):
 
 
 # Maybe interresting to specify the type of the data in order to manipulate it later.
-def get_df_with_headers(path, header_list=[], filename='ird_specal_dc-IRD_SPECAL_CONTRAST_CURVE_TABLE-contrast_curve_tab.fits'):
+def get_df_with_headers(path, header_list=[], filename='ird_specal_dc-IRD_SPECAL_CONTRAST_CURVE_TABLE-contrast_curve_tab.fits', interpolate=True):
     """
     Get a dataframe with the separation, contrast and headers specified in the list.
     """
@@ -58,6 +58,8 @@ def get_df_with_headers(path, header_list=[], filename='ird_specal_dc-IRD_SPECAL
 
     folder_names = get_folder_names(path)
 
+    # List of dictionnaries whose keys will be the same among all the dictionnaries.
+    # It will then be converted into a dataframe.
     data_dict_list = []
 
     for folder in folder_names:
@@ -80,26 +82,27 @@ def get_df_with_headers(path, header_list=[], filename='ird_specal_dc-IRD_SPECAL
     df = pd.DataFrame(data_dict_list)
 
     # Interpolate the contrast curves to have the same number of points for each observation.
+    if interpolate:
+        # Get the median length and use it as the number of points for the interpolation.
+        n_points = int(np.median((df['SEPARATION'].apply(lambda x: len(x)))))
 
-    # Get the number of points of the observation with the most points and use it as the number of points for all the observations.
-    # Maybe not ideal depending on the bas enumber of points in the observations ?
-    max_points = np.max(df['SEPARATION'].apply(lambda x: len(x)))
+        # Get the min and max separation of all the observations.
+        # Might not be the best way to do it. Maybe I should use max(min) and min(max).
+        min_sep = np.min(df['SEPARATION'].apply(lambda x: np.min(x)))
+        max_sep = np.max(df['SEPARATION'].apply(lambda x: np.max(x)))
 
-    # Get the min and max separation of all the observations.
-    min_sep = np.min(df['SEPARATION'].apply(lambda x: np.min(x)))
-    max_sep = np.max(df['SEPARATION'].apply(lambda x: np.max(x)))
+        # Create the new separation array
+        new_sep = np.linspace(min_sep, max_sep, n_points)
 
-    # Create the new separation array
-    new_sep = np.linspace(min_sep, max_sep, max_points)
+        # Interpolate the contrast curves
+        new_contrast = df.apply(lambda x: np.interp(new_sep, x['SEPARATION'], x['NSIGMA_CONTRAST']), axis=1)
+        new_sep = df.apply(lambda x: new_sep, axis = 1)
 
-    # Interpolate the contrast curves
-    new_contrast = df.apply(lambda x: np.interp(new_sep, x['SEPARATION'], x['NSIGMA_CONTRAST']), axis=1)
+        # Replace columns in the dataframe
+        df['SEPARATION'] = new_sep
+        df['NSIGMA_CONTRAST'] = new_contrast
 
-    # Replace columns in the dataframe
-    df['SEPARATION'] = new_sep
-    df['NSIGMA_CONTRAST'] = new_contrast
-
-    return pd.DataFrame(data_dict_list)
+    return df
 
 
 def write_stats_in_file(df, path, columns=['NSIGMA_CONTRAST'],filename='stats.txt', table_format='psql'):

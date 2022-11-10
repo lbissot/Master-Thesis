@@ -2,6 +2,10 @@
 |                                                            PRIO ELEVEE                                                             |
 --------------------------------------------------------------------------------------------------------------------------------------
 
+- Modifier la fonction qui calcule des stats pour y ajouter une separation min et une separation max (région d'intérêt).
+
+- Plot summary avec toutes les courbes de contraste et fill between les percentiles.
+
 - Ajouter magnitude de l'étoile (check script Simbad de Julien)
 
 - Faire un peu d'analyse de données pour les données numériques (plots, statistiques, etc)

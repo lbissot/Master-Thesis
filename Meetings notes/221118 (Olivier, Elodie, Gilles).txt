@@ -3,6 +3,10 @@
 - len(separation) varient d'une observation à l'autre du coup difficile d'obtenir les statistiques (axis = 0 : pour une séparation donnée). 
 Est-ce que je peux interpoler pour avoir un seul vecteur separation pour toutes les observations ? 
 
+- J'ai décidé d'interpoler, j'ai utilisé comme nombre de points la valeure médiane, comme sep_min la sep_min overall et pareil pour la sep_max.
+Pour les min et max ce n'est peut être pas idéal, j'ai fait ca dans le but de ne pas perdre de donnée mais du coup j'imagine que j'en crée pas mal
+pour la séparation min : vu qu'il n'y a pas de point à gauche les résultats interpolés ne sont surement pas bons.
+
 - En regardant les plots on remarque que les valeurs drop en approchant de 10 arcsec, il faudrait peut être considérer seulement un intervalle réduit ?
 Ca aurait aussi plus de sens physiquement car peut de chance qu'une planète soit si loin de son étoile et même si elle l'était, 
 la lumière de l'étoile n'intervient plus autant qu'à faible séparation. Aussi vu que le contraste est calculé en prenant la moyenne de plusieurs injections de planètes 
