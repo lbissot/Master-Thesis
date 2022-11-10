@@ -6,5 +6,4 @@ sphere-client/
 VIP tutorials/
 *.lnk
 SPHERE_DC_DATA/
-plots
 # DB_creation/*.ipynb 
