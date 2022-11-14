@@ -12,4 +12,6 @@ Ca aurait aussi plus de sens physiquement car peut de chance qu'une planète soi
 la lumière de l'étoile n'intervient plus autant qu'à faible séparation. Aussi vu que le contraste est calculé en prenant la moyenne de plusieurs injections de planètes 
 sur un cercle dont le rayon est égal à la séparation recherchée, plus le disque est grand plus petit le contraste. -> Pas trop de sens de travailler avec ces données.
 
+- Détection d'anomalies dans le dataset, comment s'y prendre ? En regardant le summary plot on voit bien que la moyenne est perturbée par un ou plusieurs outliers.
+
 - Que rajouter comme données dans le dataset ? Ou les récupérer (headers, ASM, etc) ? Comment les utiliser ?
