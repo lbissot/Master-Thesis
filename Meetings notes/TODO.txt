@@ -2,13 +2,26 @@
 |                                                            PRIO ELEVEE                                                             |
 --------------------------------------------------------------------------------------------------------------------------------------
 
-- Ajouter magnitude de l'étoile (check script Simbad de Julien)
+- Se renseigner pour les vitesses de vent 
 
+- SPARTA (Strehl, frequence, filtre spectral, filtre spatial)
+
+- FWHM
+
+- Temps d'exposure
+
+- Airmass (headers)
+
+- Temperature diff (dome/ext)
+
+- Number of frames
+
+- Sauver le df en csv + l'importer dans le google sheet chaque fois qu'un new feature est ajouté
 --------------------------------------------------------------------------------------------------------------------------------------
 |                                                            PRIO MOYENNE                                                            |
 --------------------------------------------------------------------------------------------------------------------------------------
 
-- Regarder documentation des headers et potentiellement trouver un ou deux champs en plus pour rajouter avant la réu du 18.
+- Carl Henrick : wind driven halo
 
 - Regarder le site ASM pour déjà avoir une idée de comment ca marche
 

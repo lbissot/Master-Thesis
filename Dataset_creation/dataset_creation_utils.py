@@ -5,12 +5,25 @@
 This file countains the functions used to create the dataset.
 """
 
-import os
+import os, sys
+import warnings
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy.io import fits
 from tabulate import tabulate
+import sparta.query_eso_archive as qea
+import astropy.coordinates as coord
+import astropy.units as u
+from astropy.time import Time
+
+class HiddenPrints:
+    def __enter__(self):
+        self._original_stdout = sys.stdout
+        sys.stdout = open(os.devnull, 'w')
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout.close()
+        sys.stdout = self._original_stdout
 
 
 def get_folder_names(path):
@@ -81,12 +94,6 @@ def plot_contrast(path, separation, contrast, object=''):
     if not path.endswith('/'):
         path += '/'
 
-    # Log transform of the contrast and warning suppression
-    # IDK if this is necessary if we use plt.yscale(value='log')
-
-    # with np.errstate(divide='ignore' , invalid='ignore'):
-    #     contrast = np.log10(contrast) # There are some negative and zero values in the contrast curves, maybe process them before plotting
-
     # Plot the contrast curve for each object and save it in separate files
     plt.figure()
     plt.plot(separation, contrast, label=object)
@@ -94,7 +101,7 @@ def plot_contrast(path, separation, contrast, object=''):
     plt.ylabel('Contrast (5-sigma)')
     plt.yscale(value='log')
     # Set limits for the y axis
-    plt.ylim(1e-7, 1e-1)
+    # plt.ylim(1e-7, 1e-1)
     plt.title('Contrast curve for {}'.format(object))
     filename = os.path.join(path, 'contrast_curve.png')
     # print('Saving figure {}...'.format(filename))
@@ -157,6 +164,29 @@ def get_df_with_headers(path, header_list=[], filename='ird_specal_dc-IRD_SPECAL
             data_dict['SEPARATION'] = separation
             data_dict['NSIGMA_CONTRAST'] = contrast
 
+            # Now we will query simbad and retrieve the flux in G and H bands.
+            date = Time(fits_headers['DATE-OBS'])
+            name = fits_headers['OBJECT']
+            coords = coord.SkyCoord(fits_headers['RA']*u.degree, fits_headers['DEC']*u.degree)
+
+            # Remove Julien's prints
+            with HiddenPrints():
+                # Remove the warnings
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    simbad_dico = qea.query_simbad(date, coords, name)
+            
+            # Add the fluxes to the dictionnary.
+            if 'simbad_FLUX_G' in simbad_dico.keys():
+                data_dict['SIMBAD_FLUX_G'] = simbad_dico['simbad_FLUX_G']
+            else:
+                data_dict['SIMBAD_FLUX_G'] = np.nan
+            
+            if 'simbad_FLUX_H' in simbad_dico.keys():
+                data_dict['SIMBAD_FLUX_H'] = simbad_dico['simbad_FLUX_H']
+            else:
+                data_dict['SIMBAD_FLUX_H'] = np.nan
+
             # Write the summary of the contrast in a file.
             if compute_summary:
                 with open(os.path.join(path, folder, 'contrast_summary.txt'), 'w') as f:
@@ -166,15 +196,21 @@ def get_df_with_headers(path, header_list=[], filename='ird_specal_dc-IRD_SPECAL
 
     df = pd.DataFrame(data_dict_list)
 
+    # If the df has columns ESO TEL PARANG START and ESO TEL PARANG END, compute the absolute delta parang
+    if 'ESO TEL PARANG START' in df.columns and 'ESO TEL PARANG END' in df.columns:
+        df['DELTA_PARANG'] = np.abs(df['ESO TEL PARANG END'] - df['ESO TEL PARANG START'])
+        # Remove the columns ESO TEL PARANG START and ESO TEL PARANG END
+        df = df.drop(columns=['ESO TEL PARANG START', 'ESO TEL PARANG END'])
+
     # Interpolate the contrast curves to have the same number of points for each observation
     if interpolate:
         # Get the median length and use it as the number of points for the interpolation.
         n_points = int(np.median((df['SEPARATION'].apply(lambda x: len(x)))))
 
         # Get the min and max separation of all the observations.
-        # Might not be the best way to do it. Maybe I should use max(min(x)) and min(max(x)).
-        min_sep = np.min(df['SEPARATION'].apply(lambda x: np.min(x)))
-        max_sep = np.max(df['SEPARATION'].apply(lambda x: np.max(x)))
+        # We will use the max(min(x)) and min(max(x)) in order not to have extrapolation.
+        min_sep = np.max(df['SEPARATION'].apply(lambda x: np.min(x)))
+        max_sep = np.min(df['SEPARATION'].apply(lambda x: np.max(x)))
 
         # Create the new separation array
         new_sep = np.linspace(min_sep, max_sep, n_points)
@@ -198,7 +234,7 @@ def get_df_with_headers(path, header_list=[], filename='ird_specal_dc-IRD_SPECAL
     return df
 
 
-def plot_contrast_curves_summary(path, df, filename='contrast_curves_summary.png'):
+def plot_contrast_curves_summary(path, df, filename='contrast_curves_summary.png', mode='all'):
     """	
     Plot the contrast curves mean, median and quartiles.
     """
@@ -215,14 +251,21 @@ def plot_contrast_curves_summary(path, df, filename='contrast_curves_summary.png
     q1 = np.quantile(contrast_curves, 0.25, axis=0)
     q3 = np.quantile(contrast_curves, 0.75, axis=0)
 
-    # Plot the mean, median and fill between the quartiles
-    plt.plot(separation, mean, label='Mean')
-    plt.plot(separation, mean_log, label='Mean (log values)')
-    plt.plot(separation, median, label='Median')
-    plt.fill_between(separation, q1, q3, alpha=0.5, label='Quartiles')
-    plt.legend()
+    # Plot all the curves in transparent grey
+    if mode == 'all':
+        for i in range(len(contrast_curves)):
+            plt.plot(separation, contrast_curves[i], color='grey', alpha=0.2)
+
+    # Plot the mean, median and fill between the quartiles above all the gray curves
+    plt.plot(separation, mean, color='orange', label='mean')
+    plt.plot(separation, mean_log, color='yellow', label='mean (log)')
+    plt.plot(separation, median, color='red', label='median')
+    if mode != 'all':
+        plt.fill_between(separation, q1, q3, color='lightblue', alpha=0.3, label='quartiles')
+    # Plot legend in upper right corner
+    plt.legend(loc='upper right')
     plt.xlabel('Separation (arcsec)')
-    plt.ylabel('Contrast 5-sigma')
+    plt.ylabel('Contrast (sigma)')
     plt.yscale('log')
     plt.savefig(os.path.join(path, filename), dpi=300)
 
@@ -255,6 +298,8 @@ def remove_contrast_anomalies(path, df, filename='paths_to_remove.txt', log_valu
     Remove the contrast curves that are too different from the median and write their paths in a file.
     """
     abs_deviations = get_abs_deviations_from_median(df, log_values=log_values)
+
+    df['ABS DEV'] = abs_deviations
 
     # Get the indices of the contrast curves that are too different from the median.
     # The threshold is set to 50.

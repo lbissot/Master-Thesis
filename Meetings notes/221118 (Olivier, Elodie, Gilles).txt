@@ -1,17 +1,31 @@
-- Dataset constitué seulement de 514 observations, trop peu pour un modèle ?
+- magnitudes H et G de simbad 
 
-- len(separation) varient d'une observation à l'autre du coup difficile d'obtenir les statistiques (axis = 0 : pour une séparation donnée). 
-Est-ce que je peux interpoler pour avoir un seul vecteur separation pour toutes les observations ? 
+- Frontière entre les 2 régimes différents de l'articles de Xuan car pas les mêmes conditions (instrument, etc)
 
-- J'ai décidé d'interpoler, j'ai utilisé comme nombre de points la valeure médiane, comme sep_min la sep_min overall et pareil pour la sep_max.
-Pour les min et max ce n'est peut être pas idéal, j'ai fait ca dans le but de ne pas perdre de donnée mais du coup j'imagine que j'en crée pas mal
-pour la séparation min : vu qu'il n'y a pas de point à gauche les résultats interpolés ne sont surement pas bons.
+- Vitesse vent haute alt en csv tout sur le github de Julien
 
-- En regardant les plots on remarque que les valeurs drop en approchant de 10 arcsec, il faudrait peut être considérer seulement un intervalle réduit ?
-Ca aurait aussi plus de sens physiquement car peut de chance qu'une planète soit si loin de son étoile et même si elle l'était, 
-la lumière de l'étoile n'intervient plus autant qu'à faible séparation. Aussi vu que le contraste est calculé en prenant la moyenne de plusieurs injections de planètes 
-sur un cercle dont le rayon est égal à la séparation recherchée, plus le disque est grand plus petit le contraste. -> Pas trop de sens de travailler avec ces données.
+- Haute alt pas nécessaire 
 
-- Détection d'anomalies dans le dataset, comment s'y prendre ? En regardant le summary plot on voit bien que la moyenne est perturbée par un ou plusieurs outliers.
+- Vitesse vent au sol
 
-- Que rajouter comme données dans le dataset ? Ou les récupérer (headers, ASM, etc) ? Comment les utiliser ?
+- PARANAL
+
+- Range PA (headers)
+
+- SPARTA (Strehl, freq, filtre spatial, filtre spectral)
+
+- FWHM
+
+- Carl Henrick : wind driven halo
+
+- Temps d'exposure
+
+- Airmass (headers)
+
+-Temperature (dome/ext) diff
+
+- Number of frames
+
+- Faire un google doc avec les features pour pouvoir les partager avec tlm
+
+- Prochaine réu 01/12 à 14h

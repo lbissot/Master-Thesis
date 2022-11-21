@@ -7,3 +7,4 @@ VIP tutorials/
 *.lnk
 SPHERE_DC_DATA/
 # DB_creation/*.ipynb 
+sparta/
