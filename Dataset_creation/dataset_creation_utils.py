@@ -131,6 +131,11 @@ def get_df_with_headers(path, header_list=[], filename='ird_specal_dc-IRD_SPECAL
     # It will then be converted into a dataframe.
     data_dict_list = []
 
+    # Create dictionnary with the headers as keys and 0 as values.
+    missings = {}
+    for header in header_list:
+        missings[header] = 0
+
     for folder in folder_names:
         folder = folder + '/'
 
@@ -149,7 +154,12 @@ def get_df_with_headers(path, header_list=[], filename='ird_specal_dc-IRD_SPECAL
             data_dict['folder'] = folder
 
             for header in header_list:
-                data_dict[header] = fits_headers[header]
+                try:
+                    data_dict[header] = fits_headers[header]
+                except:
+                    # print('WARNING! Header {} not found in {}.'.format(header, folder))
+                    data_dict[header] = np.nan
+                    missings[header] += 1
 
             separation = fits_data['SEPARATION'][2] # Combination of the two cameras (I think)
             contrast = fits_data['NSIGMA_CONTRAST'][2]
@@ -194,6 +204,13 @@ def get_df_with_headers(path, header_list=[], filename='ird_specal_dc-IRD_SPECAL
 
             data_dict_list.append(data_dict)
 
+    # Print the percentage of missing values for each header.
+    if missings:
+        print('Percentage of missing values:')
+        for header in missings:
+            print('{}: {:.2f}%'.format(header, missings[header]/len(folder_names)*100))
+    
+    # Create the dataframe.
     df = pd.DataFrame(data_dict_list)
 
     # If the df has columns ESO TEL PARANG START and ESO TEL PARANG END, compute the absolute delta parang
@@ -267,6 +284,7 @@ def plot_contrast_curves_summary(path, df, filename='contrast_curves_summary.png
     plt.xlabel('Separation (arcsec)')
     plt.ylabel('Contrast (sigma)')
     plt.yscale('log')
+    plt.title('Contrast curves summary')
     plt.savefig(os.path.join(path, filename), dpi=300)
 
 
