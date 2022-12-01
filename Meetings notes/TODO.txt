@@ -4,13 +4,7 @@
 
 - Se renseigner pour les vitesses de vent 
 
-- SPARTA (Strehl, frequence, filtre spectral, filtre spatial)
-
-- FWHM
-
-- Temps d'exposure
-
-- Airmass (headers)
+- Chercher après les headers manquants 
 
 - Temperature diff (dome/ext)
 

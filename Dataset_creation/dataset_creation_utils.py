@@ -135,6 +135,8 @@ def get_df_with_headers(path, header_list=[], filename='ird_specal_dc-IRD_SPECAL
     missings = {}
     for header in header_list:
         missings[header] = 0
+    missings['SIMBAD_FLUX_G'] = 0
+    missings['SIMBAD_FLUX_H'] = 0
 
     for folder in folder_names:
         folder = folder + '/'
@@ -191,11 +193,13 @@ def get_df_with_headers(path, header_list=[], filename='ird_specal_dc-IRD_SPECAL
                 data_dict['SIMBAD_FLUX_G'] = simbad_dico['simbad_FLUX_G']
             else:
                 data_dict['SIMBAD_FLUX_G'] = np.nan
+                missings['SIMBAD_FLUX_G'] += 1
             
             if 'simbad_FLUX_H' in simbad_dico.keys():
                 data_dict['SIMBAD_FLUX_H'] = simbad_dico['simbad_FLUX_H']
             else:
                 data_dict['SIMBAD_FLUX_H'] = np.nan
+                missings['SIMBAD_FLUX_H'] += 1
 
             # Write the summary of the contrast in a file.
             if compute_summary:
@@ -212,12 +216,6 @@ def get_df_with_headers(path, header_list=[], filename='ird_specal_dc-IRD_SPECAL
     
     # Create the dataframe.
     df = pd.DataFrame(data_dict_list)
-
-    # If the df has columns ESO TEL PARANG START and ESO TEL PARANG END, compute the absolute delta parang
-    if 'ESO TEL PARANG START' in df.columns and 'ESO TEL PARANG END' in df.columns:
-        df['DELTA_PARANG'] = np.abs(df['ESO TEL PARANG END'] - df['ESO TEL PARANG START'])
-        # Remove the columns ESO TEL PARANG START and ESO TEL PARANG END
-        df = df.drop(columns=['ESO TEL PARANG START', 'ESO TEL PARANG END'])
 
     # Interpolate the contrast curves to have the same number of points for each observation
     if interpolate:
