@@ -22,4 +22,4 @@ This file contains all the utility functions used to build the dataset.
 
 ### `dataset_creation_toy.ipynb`
 
-This file should not be looked at, it is simply a crash test for the implementation of the functions.
+This file shows examples of how to use the functions located in util in order to build the dataset.

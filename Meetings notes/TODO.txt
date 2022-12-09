@@ -2,13 +2,18 @@
 |                                                            PRIO ELEVEE                                                             |
 --------------------------------------------------------------------------------------------------------------------------------------
 
-- Se renseigner pour les vitesses de vent 
-
-- Chercher après les headers manquants 
+- Ask Elodie : Combien de temps dure typiquement une obseration ? Intéressant de prendre en compte dans notre dataset 
+    (surement pas vu que c'est repris dans le PA je crois + on regarde surtout le temps de cohérence) ?
+    Et du coup pour le seeing, est ce que je prends celui sur le temps d'obs (si celui-ci est assez long) ou bien sur la 
+    nuit d'observation entière ?
 
 - Temperature diff (dome/ext)
 
-- Number of frames
+- ESO ASM Archive : retirer les données manquantes (NA dans les headers), DL un csv et interpoler 
+
+- Bouger le 2-pi jump des PA
+
+- PSF FWHM
 
 - Sauver le df en csv + l'importer dans le google sheet chaque fois qu'un new feature est ajouté
 --------------------------------------------------------------------------------------------------------------------------------------
@@ -17,13 +22,9 @@
 
 - Carl Henrick : wind driven halo
 
-- Regarder le site ASM pour déjà avoir une idée de comment ca marche
-
 --------------------------------------------------------------------------------------------------------------------------------------
 |                                                            PRIO FAIBLE                                                             |
 --------------------------------------------------------------------------------------------------------------------------------------
-
-- Specifier le type des colonnes du dataframe (dates, string, etc)
 
 - Commencer le rapport si rien d'autre à faire
 

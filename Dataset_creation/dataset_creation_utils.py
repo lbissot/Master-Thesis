@@ -15,7 +15,7 @@ from tabulate import tabulate
 import sparta.query_eso_archive as qea
 import astropy.coordinates as coord
 import astropy.units as u
-from astropy.time import Time
+from astropy.time import Time, TimeDelta
 
 class HiddenPrints:
     def __enter__(self):
@@ -148,21 +148,46 @@ def get_df_with_headers(path, header_list=[], filename='ird_specal_dc-IRD_SPECAL
 
             # Write the headers in a file.
             if write_headers:
-                write_headers_in_file(os.path.join(path, folder), fits_headers)
+                # Remove the warnings
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    write_headers_in_file(os.path.join(path, folder), fits_headers)
 
             data_dict = {}
 
             # Save the folder name for potential use.
-            data_dict['folder'] = folder
+            data_dict['folder'] = str(folder)
 
             for header in header_list:
                 try:
-                    data_dict[header] = fits_headers[header]
+                    # Precise the type of the data.
+                    if header == 'DATE-OBS':
+                        data_dict[header] = Time(fits_headers[header])
+
+                    else:
+                        data_dict[header] = fits_headers[header]
                 except:
                     # print('WARNING! Header {} not found in {}.'.format(header, folder))
-                    data_dict[header] = np.nan
-                    missings[header] += 1
 
+                    # Try to recover the exposure time using other headers.
+                    if header == 'EFF_ETIM':
+                        try:
+                            data_dict[header] = fits_headers['ESO DET SEQ1 EXPTIME']
+                        except:
+                            try:
+                                data_dict[header] = fits_headers['ESO DET NDIT'] * fits_headers['ESO DET SEQ1 DIT']
+                            except:
+                                data_dict[header] = np.nan
+                                missings[header] += 1
+
+                    else:  
+                        data_dict[header] = np.nan
+                        missings[header] += 1
+
+            # Compute ESO OBS STOP = ESO OBS START + EFF_ETIM
+            if 'ESO OBS START' in header_list and 'EFF_ETIM' in header_list:
+                data_dict['ESO OBS STOP'] = Time(data_dict['ESO OBS START']) + TimeDelta(data_dict['EFF_ETIM'], format='sec')
+                
             separation = fits_data['SEPARATION'][2] # Combination of the two cameras (I think)
             contrast = fits_data['NSIGMA_CONTRAST'][2]
 

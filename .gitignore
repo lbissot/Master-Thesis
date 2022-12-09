@@ -9,3 +9,4 @@ SPHERE_DC_DATA/
 # DB_creation/*.ipynb 
 sparta/
 sphere_dl_script_sparta_
+*.csv
