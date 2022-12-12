@@ -110,6 +110,89 @@ def plot_contrast(path, separation, contrast, object=''):
     plt.close()
 
 
+def plot_contrast_curves_summary(path, df, filename='contrast_curves_summary.png', mode='all'):
+    """	
+    Plot the contrast curves mean, median and quartiles.
+    """
+    
+    separation = df['SEPARATION'][0]
+    # Get a 2D array of the contrast curves
+    contrast_curves = np.array(df['NSIGMA_CONTRAST'].tolist())
+    # Get the mean, median, first and third quartiles of the contrast curves
+    mean = np.mean(contrast_curves, axis=0)
+    # Use the log(x+1) values to compute the mean, then take the inverse transformation to get the mean in linear scale.
+    mean_log = np.power(10, np.mean(np.log10(contrast_curves + 1), axis=0)) - 1
+
+    median = np.median(contrast_curves, axis=0)
+    q1 = np.quantile(contrast_curves, 0.25, axis=0)
+    q3 = np.quantile(contrast_curves, 0.75, axis=0)
+
+    # Plot all the curves in transparent grey
+    if mode == 'all':
+        for i in range(len(contrast_curves)):
+            plt.plot(separation, contrast_curves[i], color='grey', alpha=0.2)
+
+    # Plot the mean, median and fill between the quartiles above all the gray curves
+    plt.plot(separation, mean, color='orange', label='mean')
+    plt.plot(separation, mean_log, color='yellow', label='mean (log)')
+    plt.plot(separation, median, color='red', label='median')
+    if mode != 'all':
+        plt.fill_between(separation, q1, q3, color='lightblue', alpha=0.3, label='quartiles')
+    # Plot legend in upper right corner
+    plt.legend(loc='upper right')
+    plt.xlabel('Separation (arcsec)')
+    plt.ylabel('Contrast (sigma)')
+    plt.yscale('log')
+    plt.title('Contrast curves summary')
+    plt.savefig(os.path.join(path, filename), dpi=300)
+
+
+def get_abs_deviations_from_median(df, log_values=True):
+    """
+    Get the absolute deviations from the median of the contrast curves.
+    """
+    # Get a 2D array of the contrast curves
+    contrast_curves = np.array(df['NSIGMA_CONTRAST'].tolist())
+
+    if log_values:
+        # Get the log(x + 1) values of the contrast curves
+        contrast_curves = np.log10(contrast_curves + 1)
+
+    # Compute the median of the contrast curves
+    median = np.median(contrast_curves, axis=0)
+
+    deviations = []
+
+    for curve in contrast_curves:
+        deviation = np.sum(np.abs(curve - median))
+        deviations.append(deviation)
+
+    return np.array(deviations)
+
+
+def remove_contrast_anomalies(path, df, filename='paths_to_remove.txt', log_values=True, threshold=50):
+    """
+    Remove the contrast curves that are too different from the median and write their paths in a file.
+    """
+    abs_deviations = get_abs_deviations_from_median(df, log_values=log_values)
+
+    df['ABS DEV'] = abs_deviations
+
+    # Get the indices of the contrast curves that are too different from the median.
+    # The threshold is set to 50.
+    indices = np.where(abs_deviations > threshold)[0]
+
+    # Write in a file the paths of the observations to remove.
+    with open(path + filename, 'w') as f:
+        for index in indices:
+            f.write(path + df.loc[index]['folder'] + '\n')
+
+    # Remove the contrast curves that are too different from the median.
+    df = df.drop(indices)
+
+    return df
+
+
 # Maybe interresting to specify the type of the data in order to manipulate it later.
 def get_df_with_headers(path, header_list=[], filename='ird_specal_dc-IRD_SPECAL_CONTRAST_CURVE_TABLE-contrast_curve_tab.fits', \
     max_sep=25 ,interpolate=True, compute_summary=False, write_headers=False, compute_plots=False):
@@ -270,88 +353,5 @@ def get_df_with_headers(path, header_list=[], filename='ird_specal_dc-IRD_SPECAL
 
         for i in range(len(dict_df['folder'])):
             plot_contrast(os.path.join(path, dict_df['folder'][i]), dict_df['SEPARATION'][i], dict_df['NSIGMA_CONTRAST'][i], dict_df['OBJECT'][i])
-
-    return df
-
-
-def plot_contrast_curves_summary(path, df, filename='contrast_curves_summary.png', mode='all'):
-    """	
-    Plot the contrast curves mean, median and quartiles.
-    """
-    separation = df['SEPARATION'][0]
-    # Get a 2D array of the contrast curves
-    contrast_curves = np.array(df['NSIGMA_CONTRAST'].tolist())
-
-    # Get the mean, median, first and third quartiles of the contrast curves
-    mean = np.mean(contrast_curves, axis=0)
-    # Use the log(x+1) values to compute the mean, then take the inverse transformation to get the mean in linear scale.
-    mean_log = np.power(10, np.mean(np.log10(contrast_curves + 1), axis=0)) - 1
-
-    median = np.median(contrast_curves, axis=0)
-    q1 = np.quantile(contrast_curves, 0.25, axis=0)
-    q3 = np.quantile(contrast_curves, 0.75, axis=0)
-
-    # Plot all the curves in transparent grey
-    if mode == 'all':
-        for i in range(len(contrast_curves)):
-            plt.plot(separation, contrast_curves[i], color='grey', alpha=0.2)
-
-    # Plot the mean, median and fill between the quartiles above all the gray curves
-    plt.plot(separation, mean, color='orange', label='mean')
-    plt.plot(separation, mean_log, color='yellow', label='mean (log)')
-    plt.plot(separation, median, color='red', label='median')
-    if mode != 'all':
-        plt.fill_between(separation, q1, q3, color='lightblue', alpha=0.3, label='quartiles')
-    # Plot legend in upper right corner
-    plt.legend(loc='upper right')
-    plt.xlabel('Separation (arcsec)')
-    plt.ylabel('Contrast (sigma)')
-    plt.yscale('log')
-    plt.title('Contrast curves summary')
-    plt.savefig(os.path.join(path, filename), dpi=300)
-
-
-def get_abs_deviations_from_median(df, log_values=True):
-    """
-    Get the absolute deviations from the median of the contrast curves.
-    """
-    # Get a 2D array of the contrast curves
-    contrast_curves = np.array(df['NSIGMA_CONTRAST'].tolist())
-
-    if log_values:
-        # Get the log(x + 1) values of the contrast curves
-        contrast_curves = np.log10(contrast_curves + 1)
-
-    # Compute the median of the contrast curves
-    median = np.median(contrast_curves, axis=0)
-
-    deviations = []
-
-    for curve in contrast_curves:
-        deviation = np.sum(np.abs(curve - median))
-        deviations.append(deviation)
-
-    return np.array(deviations)
-
-
-def remove_contrast_anomalies(path, df, filename='paths_to_remove.txt', log_values=True, threshold=50):
-    """
-    Remove the contrast curves that are too different from the median and write their paths in a file.
-    """
-    abs_deviations = get_abs_deviations_from_median(df, log_values=log_values)
-
-    df['ABS DEV'] = abs_deviations
-
-    # Get the indices of the contrast curves that are too different from the median.
-    # The threshold is set to 50.
-    indices = np.where(abs_deviations > threshold)[0]
-
-    # Write in a file the paths of the observations to remove.
-    with open(path + filename, 'w') as f:
-        for index in indices:
-            f.write(path + df.loc[index]['folder'] + '\n')
-
-    # Remove the contrast curves that are too different from the median.
-    df = df.drop(indices)
 
     return df
