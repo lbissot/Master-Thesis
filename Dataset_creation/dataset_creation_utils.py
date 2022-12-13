@@ -284,6 +284,10 @@ def get_df_with_headers(path, header_list=[], filename='ird_specal_dc-IRD_SPECAL
             data_dict['SEPARATION'] = separation
             data_dict['NSIGMA_CONTRAST'] = contrast
 
+            if len(data_dict['NSIGMA_CONTRAST']) == 0:
+                    print("No contrast curve for folder {}".format(folder))
+                    continue
+
             # Now we will query simbad and retrieve the flux in G and H bands.
             date = Time(fits_headers['DATE-OBS'])
             name = fits_headers['OBJECT']
