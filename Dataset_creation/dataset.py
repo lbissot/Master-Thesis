@@ -17,7 +17,7 @@ import sparta.query_eso_archive as qea
 import astropy.coordinates as coord
 import astropy.units as u
 from astropy.time import Time, TimeDelta
-from dataset_creation_utils import HiddenPrints, get_folder_names, get_vector_summary_table
+from dataset_creation_utils import HiddenPrints, get_folder_names, get_vector_summary_table, find_lower_upper_bound
 
 
 class Dataset:
@@ -30,7 +30,6 @@ class Dataset:
         -------
         pandas.DataFrame
             Dataset.
-
         """
         return self.__df
 
@@ -41,7 +40,6 @@ class Dataset:
         Returns
         -------
         None.
-
         """
         if self.__missings is None:
             print('No missing values.')
@@ -52,6 +50,16 @@ class Dataset:
     def get_contrast_abs_deviations_from_median(self, log_values=True):
         """
         Get the absolute deviations from the median of the contrast curves.
+
+        Parameters
+        ----------
+        log_values : bool, optional
+            If True, the log(x + 1) values of the contrast curves are used. The default is True.
+
+        Returns
+        -------
+        numpy.ndarray
+            Absolute deviations from the median of the contrast curves.
         """
         # Get a 2D array of the contrast curves
         contrast_curves = np.array(self.__df['NSIGMA_CONTRAST'].tolist())
@@ -72,6 +80,24 @@ class Dataset:
         return np.array(deviations)
 
     def remove_contrast_anomalies(self, filename='paths_to_remove.txt', log_values=True, threshold=50):
+        """
+        Remove the contrast curves that are too different from the median.
+
+        Parameters
+        ----------
+        filename : str, optional
+            Name of the file where the paths of the observations to remove are written. The default is 'paths_to_remove.txt'.
+
+        log_values : bool, optional
+            If True, the log(x + 1) values of the contrast curves are used. The default is True.
+
+        threshold : int, optional
+            Threshold of the absolute deviation from the median. The default is 50.
+
+        Returns
+        -------
+        None.
+        """
         
         abs_deviations = self.get_contrast_abs_deviations_from_median(log_values=log_values)
         # Get the indices of the contrast curves that are too different from the median.
@@ -88,7 +114,19 @@ class Dataset:
 
     def plot_contrast_curves_summary(self, filename='contrast_curves_summary.png', mode='all'):
         """	
-        Plot the contrast curves mean, median and quartiles.
+        Plot the contrast curves along with their mean and median curves.
+
+        Parameters
+        ----------
+        filename : str, optional
+            Name of the file where the plot is saved. The default is 'contrast_curves_summary.png'.
+
+        mode : str, optional
+            If 'all', all the contrast curves are plotted. If 'summary', only the mean, median and quartiles are plotted. The default is 'all'.
+
+        Returns
+        -------
+        None.
         """
         
         separation = self.__df['SEPARATION'][0]
@@ -256,6 +294,48 @@ class Dataset:
                     data_dict['SIMBAD_FLUX_H'] = np.nan
                     self.__missings['SIMBAD_FLUX_H'] += 1
 
+                # Since we have a lot of observations lasting less than 5 minutes we probably won't find the time interval
+                # in the ASM database. So we will query the ASM database with a 15 minutes addition before and after.
+                start = Time(data_dict['ESO OBS START']) - TimeDelta(900, format='sec')
+                stop = Time(data_dict['ESO OBS STOP']) + TimeDelta(900, format='sec')
+
+                # Check if the observation is before april 02 2016 (Update of the ASM)
+                with HiddenPrints():
+                    if data_dict['ESO OBS START'] < Time('2016-04-02T00:00:00'):
+                        # Query the old dimm
+                        try: 
+                            asm_data = qea.query_old_dimm(os.path.join(path, folder), str(start), str(stop))
+                        except:
+                            asm_data = pd.DataFrame()
+                    else:
+                        # Query mass
+                        try:
+                            asm_data = qea.query_mass(os.path.join(path, folder), str(start), str(stop))
+                        except:
+                            asm_data = pd.DataFrame()
+
+                if len(asm_data) != 0:
+                    lower, _ = find_lower_upper_bound(asm_data.to_dict()['Date time'], data_dict['ESO OBS START'])
+                    _, upper = find_lower_upper_bound(asm_data.to_dict()['Date time'], data_dict['ESO OBS STOP'])
+
+                    # Drop the rows before lower and after upper.
+                    asm_data = asm_data.reset_index()
+                    asm_data = asm_data.iloc[lower:upper+1]
+
+                    try:
+                        asm_data['Date time'] = asm_data['Date time'].dt.floor('T')
+                        asm_data = asm_data.set_index('Date time')
+                        new_dates = pd.date_range(start=asm_data.index[0], end=asm_data.index[-1], freq='1min')
+                        asm_data = asm_data.reindex(new_dates)
+                        asm_data = asm_data.interpolate(method='linear')
+                    except:
+                        print("Error while interpolating the asmd-mass data for the folder {}".format(folder))
+                        print("ESO OBS START = {} and ESO OBS STOP = {}".format(data_dict['ESO OBS START'], data_dict['ESO OBS STOP']))
+                        # print(asm_data)
+                else:
+                    print("No data for the folder {}".format(folder))
+                    
+
                 # Write the summary of the contrast in a file.
                 with open(os.path.join(self.__path, folder, 'contrast_summary.txt'), 'w') as f:
                     try:
@@ -300,6 +380,24 @@ class Dataset:
     def __write_headers_in_file(self, path, fits_headers, filename='headers.txt', table_format='psql'):
         """
         Write fits headers in a file.
+
+        Parameters
+        ----------
+        path : str
+            Path to the folder where the file will be written.
+
+        fits_headers : astropy.io.fits.Header
+            The fits headers.
+
+        filename : str, optional
+            Name of the file where the headers will be written. The default is 'headers.txt'.
+
+        table_format : str, optional
+            Format of the table. The default is 'psql'.
+
+        Returns
+        -------
+        None.
         """
 
         if not os.path.exists(path):
@@ -329,7 +427,25 @@ class Dataset:
 
     def __plot_contrast(self, path, separation, contrast, object=''):
         """
-        Plot the contrast curve.
+        Plot the contrast curve and save it in a file.
+
+        Parameters
+        ----------
+        path : str
+            Path to the folder where the file will be written.
+        
+        separation : numpy.ndarray
+            Separation vector.
+
+        contrast : numpy.ndarray
+            Contrast vector.
+
+        object : str, optional
+            Name of the object. The default is ''.
+
+        Returns
+        -------
+        None.
         """
 
         if not os.path.exists(path):
