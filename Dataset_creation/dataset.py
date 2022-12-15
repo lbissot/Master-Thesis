@@ -190,11 +190,11 @@ class Dataset:
         self.__path = path
 
         # List of fits headers to be used in the dataset.
-        self.__header_list = ['ESO OBS ID', 'DATE-OBS', 'ESO OBS START', 'OBJECT', 'ESO TEL AMBI FWHM MEAN', 'ESO TEL TAU0 MEAN', \
+        self.__header_list = ['ESO OBS ID', 'DATE-OBS', 'OBJECT', 'ESO TEL AMBI FWHM MEAN', 'ESO TEL TAU0 MEAN', \
             'ESO TEL AIRM MEAN', 'EFF_NFRA', 'EFF_ETIM', 'SR_AVG', 'ESO INS4 FILT3 NAME', \
                 'ESO INS4 OPTI22 NAME', 'ESO AOS VISWFS MODE', 'ESO TEL AMBI WINDSP', 'SCFOVROT', 'SC MODE', \
                     'ESO TEL AMBI RHUM', 'HIERARCH ESO INS4 TEMP422 VAL', 'HIERARCH ESO TEL TH M1 TEMP', \
-                        'HIERARCH ESO TEL AMBI TEMP']
+                        'HIERARCH ESO TEL AMBI TEMP', 'OBS_STA', 'OBS_END']
         
         self.__folder_names = get_folder_names(path)
         self.__filename='ird_specal_dc-IRD_SPECAL_CONTRAST_CURVE_TABLE-contrast_curve_tab.fits'
@@ -205,10 +205,24 @@ class Dataset:
 
         # Create dictionnary with the headers as keys and 0 as values.
         self.__missings = {}
+        # We will investiguate the missing headers to see if the missings correspond
+        # to a specific update time of the database.
+        self.__dates_missing_dict = {}
+        self.__dates_not_missing_dict = {}
+
         for header in self.__header_list:
+            # Counter of the number of missing headers
             self.__missings[header] = 0
+            # List of the dates of the missing headers (to retrieve min and max dates)
+            self.__dates_missing_dict[header] = []
+            # List of the dates of the not missing headers (to retrieve min and max dates)
+            self.__dates_not_missing_dict[header] = []
+
+        # Not in header list as it is not a fits header but a query to make on Simbad.
         self.__missings['SIMBAD_FLUX_G'] = 0
         self.__missings['SIMBAD_FLUX_H'] = 0
+        self.__dates_missing_dict['SIMBAD_FLUX_G'] = []
+        self.__dates_missing_dict['SIMBAD_FLUX_H'] = []
 
         print('Creating the dataset...')
         for folder in tqdm(self.__folder_names):
@@ -230,6 +244,7 @@ class Dataset:
 
                 # Add the wanted fits headers to the dictionnary.
                 for header in self.__header_list:
+
                     try:
                         # Precise the type of the data.
                         if header == 'DATE-OBS':
@@ -237,24 +252,25 @@ class Dataset:
 
                         else:
                             data_dict[header] = fits_headers[header]
-                    except:
-                        # Try to recover the exposure time using other headers.
-                        if header == 'EFF_ETIM':
-                            try:
-                                data_dict[header] = fits_headers['ESO DET SEQ1 EXPTIME']
-                            except:
-                                try:
-                                    data_dict[header] = fits_headers['ESO DET NDIT'] * fits_headers['ESO DET SEQ1 DIT']
-                                except:
-                                    data_dict[header] = np.nan
-                                    self.__missings[header] += 1
-                        else:  
-                            data_dict[header] = np.nan
-                            self.__missings[header] += 1
 
-                # Compute ESO OBS STOP = ESO OBS START + EFF_ETIM
-                if 'ESO OBS START' in self.__header_list and 'EFF_ETIM' in self.__header_list:
-                    data_dict['ESO OBS STOP'] = Time(data_dict['ESO OBS START']) + TimeDelta(data_dict['EFF_ETIM'], format='sec')
+                        self.__dates_not_missing_dict[header].append(Time(fits_headers['DATE']))
+                    except:
+
+                        self.__dates_missing_dict[header].append(Time(fits_headers['DATE']))
+
+                        # Create a file named 'header_missing.txt' with the folders where the header is missing.
+                        # If first encountered missing header, create the file and write the folder name.
+                        # Else, append the folder name to the file.
+                        if self.__missings[header] == 0:
+                            with open(os.path.join(path, "{}_missing.txt".format(header)), 'w') as f:
+                                f.write("Folder : {}\nDate: {}\n\n".format(folder, fits_headers['DATE']))
+                        else:
+                            with open(os.path.join(path, "{}_missing.txt".format(header)), 'a') as f:
+                                f.write("Folder : {}\nDate: {}\n\n".format(folder, fits_headers['DATE']))
+
+                        # Increment the missing counter.
+                        data_dict[header] = np.nan
+                        self.__missings[header] += 1
 
                 separation = fits_data['SEPARATION'][2] # Combination of the two cameras (I think)
                 contrast = fits_data['NSIGMA_CONTRAST'][2]
@@ -296,44 +312,45 @@ class Dataset:
 
                 # Since we have a lot of observations lasting less than 5 minutes we probably won't find the time interval
                 # in the ASM database. So we will query the ASM database with a 15 minutes addition before and after.
-                start = Time(data_dict['ESO OBS START']) - TimeDelta(900, format='sec')
-                stop = Time(data_dict['ESO OBS STOP']) + TimeDelta(900, format='sec')
+                
+                # start = Time(data_dict['ESO OBS START']) - TimeDelta(900, format='sec')
+                # stop = Time(data_dict['ESO OBS STOP']) + TimeDelta(900, format='sec')
 
-                # Check if the observation is before april 02 2016 (Update of the ASM)
-                with HiddenPrints():
-                    if data_dict['ESO OBS START'] < Time('2016-04-02T00:00:00'):
-                        # Query the old dimm
-                        try: 
-                            asm_data = qea.query_old_dimm(os.path.join(path, folder), str(start), str(stop))
-                        except:
-                            asm_data = pd.DataFrame()
-                    else:
-                        # Query mass
-                        try:
-                            asm_data = qea.query_mass(os.path.join(path, folder), str(start), str(stop))
-                        except:
-                            asm_data = pd.DataFrame()
+                # # Check if the observation is before april 02 2016 (Update of the ASM)
+                # with HiddenPrints():
+                #     if data_dict['ESO OBS START'] < Time('2016-04-02T00:00:00'):
+                #         # Query the old dimm
+                #         try: 
+                #             asm_data = qea.query_old_dimm(os.path.join(path, folder), str(start), str(stop))
+                #         except:
+                #             asm_data = pd.DataFrame()
+                #     else:
+                #         # Query mass
+                #         try:
+                #             asm_data = qea.query_mass(os.path.join(path, folder), str(start), str(stop))
+                #         except:
+                #             asm_data = pd.DataFrame()
 
-                if len(asm_data) != 0:
-                    lower, _ = find_lower_upper_bound(asm_data.to_dict()['Date time'], data_dict['ESO OBS START'])
-                    _, upper = find_lower_upper_bound(asm_data.to_dict()['Date time'], data_dict['ESO OBS STOP'])
+                # if len(asm_data) != 0:
+                #     asm_data = asm_data.reset_index()
+                #     lower, _ = find_lower_upper_bound(asm_data.to_dict()['Date time'], Time(data_dict['ESO OBS START']))
+                #     _, upper = find_lower_upper_bound(asm_data.to_dict()['Date time'], Time(data_dict['ESO OBS STOP']))
 
-                    # Drop the rows before lower and after upper.
-                    asm_data = asm_data.reset_index()
-                    asm_data = asm_data.iloc[lower:upper+1]
+                #     # Drop the rows before lower and after upper.
+                #     asm_data = asm_data.iloc[lower:upper+1]
 
-                    try:
-                        asm_data['Date time'] = asm_data['Date time'].dt.floor('T')
-                        asm_data = asm_data.set_index('Date time')
-                        new_dates = pd.date_range(start=asm_data.index[0], end=asm_data.index[-1], freq='1min')
-                        asm_data = asm_data.reindex(new_dates)
-                        asm_data = asm_data.interpolate(method='linear')
-                    except:
-                        print("Error while interpolating the asmd-mass data for the folder {}".format(folder))
-                        print("ESO OBS START = {} and ESO OBS STOP = {}".format(data_dict['ESO OBS START'], data_dict['ESO OBS STOP']))
-                        # print(asm_data)
-                else:
-                    print("No data for the folder {}".format(folder))
+                #     try:
+                #         asm_data['Date time'] = asm_data['Date time'].dt.floor('T')
+                #         asm_data = asm_data.set_index('Date time')
+                #         new_dates = pd.date_range(start=asm_data.index[0], end=asm_data.index[-1], freq='1min')
+                #         asm_data = asm_data.reindex(new_dates)
+                #         asm_data = asm_data.interpolate(method='linear')
+                #     except:
+                #         print("Error while interpolating the asmd-mass data for the folder {}".format(folder))
+                #         print("ESO OBS START = {} and ESO OBS STOP = {}".format(data_dict['ESO OBS START'], data_dict['ESO OBS STOP']))
+                #         # print(asm_data)
+                # else:
+                #     print("No data for the folder {}".format(folder))
                     
 
                 # Write the summary of the contrast in a file.
@@ -345,6 +362,13 @@ class Dataset:
                         print(data_dict['NSIGMA_CONTRAST'])
 
                 data_dict_list.append(data_dict)
+
+        # Write in a file the max date of the missing data along with the min date of the non missing data.
+        with open(os.path.join(self.__path, 'missing_data_dates_summary.txt'), 'w') as f:
+            for header in self.__header_list:
+                if self.__missings[header] != 0:
+                    f.write("{} : \nmax date of the missing values = {} \nmin date of the non missing values = {} \n\n".format(\
+                        header, max(self.__dates_missing_dict[header]), min(self.__dates_not_missing_dict[header])))
 
         # Create the dataframe.
         self.__df = pd.DataFrame(data_dict_list)
