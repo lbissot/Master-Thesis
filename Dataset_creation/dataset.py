@@ -190,7 +190,10 @@ class Dataset:
         self.__path = path
 
         # List of fits headers to be used in the dataset.
-        self.__header_list = ['ESO OBS ID', 'DATE-OBS', 'OBJECT', 'ESO TEL AMBI FWHM MEAN', 'ESO TEL TAU0 MEAN', \
+        # 'ESO TEL AMBI FWHM MEAN', 'ESO TEL TAU0 MEAN' are not used because they are not available for all the observations.
+        # We will query http://archive.eso.org/cms/eso-data/ambient-conditions/paranal-ambient-query-forms.html 
+        # to recover them and thus being consistant by applying the same correction to all the observations.
+        self.__header_list = ['ESO OBS ID', 'DATE-OBS', 'OBJECT', \
             'ESO TEL AIRM MEAN', 'EFF_NFRA', 'EFF_ETIM', 'SR_AVG', 'ESO INS4 FILT3 NAME', \
                 'ESO INS4 OPTI22 NAME', 'ESO AOS VISWFS MODE', 'ESO TEL AMBI WINDSP', 'SCFOVROT', 'SC MODE', \
                     'ESO TEL AMBI RHUM', 'HIERARCH ESO INS4 TEMP422 VAL', 'HIERARCH ESO TEL TH M1 TEMP', \
@@ -218,11 +221,13 @@ class Dataset:
             # List of the dates of the not missing headers (to retrieve min and max dates)
             self.__dates_not_missing_dict[header] = []
 
-        # Not in header list as it is not a fits header but a query to make on Simbad.
+        # Not in header list as it is not a fits header but a query to make.
         self.__missings['SIMBAD_FLUX_G'] = 0
         self.__missings['SIMBAD_FLUX_H'] = 0
-        self.__dates_missing_dict['SIMBAD_FLUX_G'] = []
-        self.__dates_missing_dict['SIMBAD_FLUX_H'] = []
+        self.__missings['SEEING_MEDIAN'] = 0
+        self.__missings['SEEING_STD'] = 0
+        self.__missings['COHERENCE_TIME_MEDIAN'] = 0
+        self.__missings['COHERENCE_TIME_STD'] = 0
 
         print('Creating the dataset...')
         for folder in tqdm(self.__folder_names):
@@ -249,6 +254,10 @@ class Dataset:
                         # Precise the type of the data.
                         if header == 'DATE-OBS':
                             data_dict[header] = Time(fits_headers[header])
+
+                        elif header == 'SR_AVG' and fits_headers[header] <= 0:
+                            data_dict[header] = np.nan
+                            self.__missings[header] += 1
 
                         else:
                             data_dict[header] = fits_headers[header]
@@ -310,55 +319,62 @@ class Dataset:
                     data_dict['SIMBAD_FLUX_H'] = np.nan
                     self.__missings['SIMBAD_FLUX_H'] += 1
 
-                # Since we have a lot of observations lasting less than 5 minutes we probably won't find the time interval
-                # in the ASM database. So we will query the ASM database with a 15 minutes addition before and after.
-                
-                # start = Time(data_dict['ESO OBS START']) - TimeDelta(900, format='sec')
-                # stop = Time(data_dict['ESO OBS STOP']) + TimeDelta(900, format='sec')
+                # Query ASM and retrieve the seeing and coherence time.
+                try:
+                    # We add 15 minutes to the start and end of the observation to be sure to retrieve data.
+                    # The observation can be shorter than the non-consistant delta time of the ASM.
+                    start = Time(data_dict['OBS_STA']) - TimeDelta(900, format='sec')
+                    stop = Time(data_dict['OBS_END']) + TimeDelta(900, format='sec')
 
-                # # Check if the observation is before april 02 2016 (Update of the ASM)
-                # with HiddenPrints():
-                #     if data_dict['ESO OBS START'] < Time('2016-04-02T00:00:00'):
-                #         # Query the old dimm
-                #         try: 
-                #             asm_data = qea.query_old_dimm(os.path.join(path, folder), str(start), str(stop))
-                #         except:
-                #             asm_data = pd.DataFrame()
-                #     else:
-                #         # Query mass
-                #         try:
-                #             asm_data = qea.query_mass(os.path.join(path, folder), str(start), str(stop))
-                #         except:
-                #             asm_data = pd.DataFrame()
+                    # If the observation is before 2 april 2016, we use the old query.
+                    # Else, we use the new query.
+                    # with HiddenPrints():
+                    if start < Time('2016-04-02T00:00:00.000', format='isot'):
+                        print('Old query')
+                        with HiddenPrints():
+                            asm_data = qea.query_old_dimm(os.path.join(self.__path, folder), str(start), str(stop))
+                        seeing = pd.DataFrame(asm_data['DIMM Seeing ["]'])
+                        coherence_time = pd.DataFrame(asm_data['Tau0 [s]'])
+                    else:
+                        print('New query')
+                        with HiddenPrints():
+                            asm_data = qea.query_mass(os.path.join(self.__path, 'ESO ASM PARANAL/'), str(start), str(stop))
+                        print('Seeing dataframe...')
+                        seeing = pd.DataFrame(asm_data['MASS-DIMM Seeing ["]'])
+                        print('Coherence dataframe...')
+                        coherence_time = pd.DataFrame(asm_data['MASS-DIMM Tau0 [s]'])
 
-                # if len(asm_data) != 0:
-                #     asm_data = asm_data.reset_index()
-                #     lower, _ = find_lower_upper_bound(asm_data.to_dict()['Date time'], Time(data_dict['ESO OBS START']))
-                #     _, upper = find_lower_upper_bound(asm_data.to_dict()['Date time'], Time(data_dict['ESO OBS STOP']))
+                    print('Interpolate...')
+                    # Interpolate the data to have a consistant step size of 1 minute.
+                    seeing = self.__interpolate_dates(seeing, 'Date time', data_dict['OBS_STA'], data_dict['OBS_END'])
+                    coherence_time = self.__interpolate_dates(coherence_time, 'Date time', data_dict['OBS_STA'], data_dict['OBS_END'])
 
-                #     # Drop the rows before lower and after upper.
-                #     asm_data = asm_data.iloc[lower:upper+1]
+                    print('Compute median and std...')
+                    # Compute the median and std of the seeing and coherence time.
+                    data_dict['SEEING_MEDIAN'] = seeing.median()
+                    data_dict['SEEING_STD'] = seeing.std()
+                    data_dict['COHERENCE_TIME_MEDIAN'] = coherence_time.median()
+                    data_dict['COHERENCE_TIME_STD'] = coherence_time.std()
 
-                #     try:
-                #         asm_data['Date time'] = asm_data['Date time'].dt.floor('T')
-                #         asm_data = asm_data.set_index('Date time')
-                #         new_dates = pd.date_range(start=asm_data.index[0], end=asm_data.index[-1], freq='1min')
-                #         asm_data = asm_data.reindex(new_dates)
-                #         asm_data = asm_data.interpolate(method='linear')
-                #     except:
-                #         print("Error while interpolating the asmd-mass data for the folder {}".format(folder))
-                #         print("ESO OBS START = {} and ESO OBS STOP = {}".format(data_dict['ESO OBS START'], data_dict['ESO OBS STOP']))
-                #         # print(asm_data)
-                # else:
-                #     print("No data for the folder {}".format(folder))
-                    
+                    print("Done !")
+
+                except:
+                    self.__missings['SEEING_MEDIAN'] += 1
+                    self.__missings['SEEING_STD'] += 1
+                    self.__missings['COHERENCE_TIME_MEDIAN'] += 1
+                    self.__missings['COHERENCE_TIME_STD'] += 1
+                    data_dict['SEEING_MEDIAN'] = np.nan
+                    data_dict['SEEING_STD'] = np.nan
+                    data_dict['COHERENCE_TIME_MEDIAN'] = np.nan
+                    data_dict['COHERENCE_TIME_STD'] = np.nan
+              
 
                 # Write the summary of the contrast in a file.
                 with open(os.path.join(self.__path, folder, 'contrast_summary.txt'), 'w') as f:
                     try:
                         f.write(get_vector_summary_table(data_dict['NSIGMA_CONTRAST'], 'NSIGMA_CONTRAST'))
                     except:
-                        print("Error while writing the contrast summary for the folder {} ({})".format(i, folder))
+                        print("Error while writing the contrast summary for the folder {}".format(folder))
                         print(data_dict['NSIGMA_CONTRAST'])
 
                 data_dict_list.append(data_dict)
@@ -492,3 +508,50 @@ class Dataset:
         plt.plot()
         plt.savefig(filename)
         plt.close()
+
+    def __interpolate_dates(self, df, date_column, start, stop):
+        """
+        Interpolate the values of the dataframe between the start and stop dates.
+
+        Parameters
+        ----------
+        df : pandas.DataFrame
+            Dataframe with the values to interpolate.
+
+        date_column : str
+            Name of the column with the dates.
+
+        start : str
+            Start date.
+
+        stop : str
+            Stop date.
+
+        Returns
+        -------
+        df : pandas.DataFrame
+            Dataframe with the interpolated values.
+        """
+        df = df.dropna()
+        # Check if the index is already the dates
+        if df.index.name == date_column:
+            df = df.reset_index()
+        
+        lower, _ = find_lower_upper_bound(list(df[date_column]), Time(start))
+        _, upper = find_lower_upper_bound(list(df[date_column]), Time(stop))
+
+        # Drop the rows before and after the start and stop dates
+        df = df.iloc[lower:upper+1]
+
+        # Round the dates to the nearest minute
+        df[date_column] = df[date_column].dt.round('min')
+
+        # Set the date column as the index
+        df = df.set_index(date_column)
+        
+        # Interpolate the values
+        new_dates = pd.date_range(df.index[0], df.index[-1], freq='min')
+        df = df.reindex(new_dates)
+        df = df.interpolate(method='linear')
+
+        return df
