@@ -46,7 +46,7 @@ If you are using windows you should install [wget](https://gnuwin32.sourceforge.
 
 ### SPHERE data
 
-You can either retrieve the SPHERE data download script from the [SPHERE client](https://sphere.osug.fr/spip.php?rubrique34&lang=fr) or simply use the one located in `DB_creation/Download Scripts`. 
+You can either retrieve the SPHERE data download script from the [SPHERE client](https://sphere.osug.fr/spip.php?rubrique34&lang=fr) or simply use the one located in `Dataset_creation/Download Scripts`. 
 Note that if you download the script yourself you need to parse it using `Dataset_creation/sphere_dl_parser.py` in order to skip unwanted (and voluminous) files.
 
 Then you just have to launch a terminal in the script folder and execute it.

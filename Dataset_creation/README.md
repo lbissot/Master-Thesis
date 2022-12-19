@@ -16,10 +16,14 @@ Contains the shell scripts which when executed retrieve data from the sphere cli
 
 This file is used to remove undesired entries from the download scripts in order not to download an excessive amount of data.
 
+### dataset.py
+
+This file contains the class dataset along with its methods.
+
 ### `dataset_creation_utils.py`
 
 This file contains all the utility functions used to build the dataset.
 
 ### `dataset_creation_toy.ipynb`
 
-This file shows examples of how to use the functions located in util in order to build the dataset.
+This file shows examples of how to use the dataset class.

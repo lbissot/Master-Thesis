@@ -330,35 +330,28 @@ class Dataset:
                     # Else, we use the new query.
                     # with HiddenPrints():
                     if start < Time('2016-04-02T00:00:00.000', format='isot'):
-                        print('Old query')
                         with HiddenPrints():
                             asm_data = qea.query_old_dimm(os.path.join(self.__path, folder), str(start), str(stop))
                         seeing = pd.DataFrame(asm_data['DIMM Seeing ["]'])
                         coherence_time = pd.DataFrame(asm_data['Tau0 [s]'])
                     else:
-                        print('New query')
                         with HiddenPrints():
-                            asm_data = qea.query_mass(os.path.join(self.__path, 'ESO ASM PARANAL/'), str(start), str(stop))
-                        print('Seeing dataframe...')
+                            asm_data = qea.query_mass(os.path.join(self.__path, folder), str(start), str(stop))
                         seeing = pd.DataFrame(asm_data['MASS-DIMM Seeing ["]'])
-                        print('Coherence dataframe...')
                         coherence_time = pd.DataFrame(asm_data['MASS-DIMM Tau0 [s]'])
 
-                    print('Interpolate...')
                     # Interpolate the data to have a consistant step size of 1 minute.
                     seeing = self.__interpolate_dates(seeing, 'Date time', data_dict['OBS_STA'], data_dict['OBS_END'])
                     coherence_time = self.__interpolate_dates(coherence_time, 'Date time', data_dict['OBS_STA'], data_dict['OBS_END'])
 
-                    print('Compute median and std...')
                     # Compute the median and std of the seeing and coherence time.
                     data_dict['SEEING_MEDIAN'] = seeing.median()
                     data_dict['SEEING_STD'] = seeing.std()
                     data_dict['COHERENCE_TIME_MEDIAN'] = coherence_time.median()
                     data_dict['COHERENCE_TIME_STD'] = coherence_time.std()
 
-                    print("Done !")
-
                 except:
+
                     self.__missings['SEEING_MEDIAN'] += 1
                     self.__missings['SEEING_STD'] += 1
                     self.__missings['COHERENCE_TIME_MEDIAN'] += 1
@@ -368,7 +361,6 @@ class Dataset:
                     data_dict['COHERENCE_TIME_MEDIAN'] = np.nan
                     data_dict['COHERENCE_TIME_STD'] = np.nan
               
-
                 # Write the summary of the contrast in a file.
                 with open(os.path.join(self.__path, folder, 'contrast_summary.txt'), 'w') as f:
                     try:
