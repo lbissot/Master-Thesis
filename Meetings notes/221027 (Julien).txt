@@ -3,8 +3,8 @@ Notes du meeting du 27/10/2022 avec Julien :
 - Récupérer les données en bande H2H3 en cADI :
 
     Browse process 
-    Workflow/recipe/ird_specal_dc
-    Workflow/preset/cADI_softsorting / ird_specal_dc / production
+    Process/recipe/ird_specal_dc
+    Process/preset/cADI_softsorting / ird_specal_dc / production
 
     Observations/Filter/DB_h23
 
