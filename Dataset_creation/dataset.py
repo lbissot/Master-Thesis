@@ -7,6 +7,7 @@ This file countains the dataset object.
 
 import os, sys
 import warnings
+import csv
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -45,7 +46,41 @@ class Dataset:
             print('No missing values.')
         else:
             for header in self.__missings:
-                print('{}: {:.2f}%'.format(header, self.__missings[header]/len(self.__folder_names)*100))
+                print('{}: {:.2f}%'.format(header, len(self.__missings[header])/len(self.__folder_names)*100))
+
+    def get_missings_csv(self, filename='missings.csv'):
+        """
+        Get a csv file where the columns are the headers and the rows are the folder names.
+        If the header is missing for a given folder, the corresponding cell indocates it.
+
+        Parameters
+        ----------
+        filename : str, optional
+            Name of the csv file. The default is 'missings.csv'.
+
+        Returns
+        -------
+        None.
+        """
+        with open(filename, mode='w', newline='') as csv_file:
+            # Delimiter is a semicolon in Europe
+            csv_writer = csv.writer(csv_file, delimiter=';', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+
+            # Write the headers
+            headers = list(self.__missings.keys())
+            csv_writer.writerow([''] + headers)
+
+            # Write the folder names
+            for folder in self.__folder_names:
+                row = [folder]
+                # In self.__missings the foldernames finish by '/'
+                folder = folder + '/'
+                for header in headers:
+                    if folder in self.__missings[header]:
+                        row.append('x')
+                    else:
+                        row.append('')
+                csv_writer.writerow(row)
 
     def get_contrast_abs_deviations_from_median(self, log_values=True):
         """
@@ -214,20 +249,20 @@ class Dataset:
         self.__dates_not_missing_dict = {}
 
         for header in self.__header_list:
-            # Counter of the number of missing headers
-            self.__missings[header] = 0
+            # List of the foldernames of missing headers
+            self.__missings[header] = []
             # List of the dates of the missing headers (to retrieve min and max dates)
             self.__dates_missing_dict[header] = []
             # List of the dates of the not missing headers (to retrieve min and max dates)
             self.__dates_not_missing_dict[header] = []
 
         # Not in header list as it is not a fits header but a query to make.
-        self.__missings['SIMBAD_FLUX_G'] = 0
-        self.__missings['SIMBAD_FLUX_H'] = 0
-        self.__missings['SEEING_MEDIAN'] = 0
-        self.__missings['SEEING_STD'] = 0
-        self.__missings['COHERENCE_TIME_MEDIAN'] = 0
-        self.__missings['COHERENCE_TIME_STD'] = 0
+        self.__missings['SIMBAD_FLUX_G'] = []
+        self.__missings['SIMBAD_FLUX_H'] = []
+        self.__missings['SEEING_MEDIAN'] = []
+        self.__missings['SEEING_STD'] = []
+        self.__missings['COHERENCE_TIME_MEDIAN'] = []
+        self.__missings['COHERENCE_TIME_STD'] = []
 
         print('Creating the dataset...')
         for folder in tqdm(self.__folder_names):
@@ -259,6 +294,9 @@ class Dataset:
                             data_dict[header] = np.nan
                             self.__missings[header] += 1
 
+                        elif header == 'SCFOVROT':
+                            data_dict[header] = fits_headers[header] % 180
+
                         else:
                             data_dict[header] = fits_headers[header]
 
@@ -277,9 +315,9 @@ class Dataset:
                             with open(os.path.join(path, "{}_missing.txt".format(header)), 'a') as f:
                                 f.write("Folder : {}\nDate: {}\n\n".format(folder, fits_headers['DATE']))
 
-                        # Increment the missing counter.
+                        # Add the folder name to the missing list.
                         data_dict[header] = np.nan
-                        self.__missings[header] += 1
+                        self.__missings[header].append(folder)
 
                 separation = fits_data['SEPARATION'][2] # Combination of the two cameras (I think)
                 contrast = fits_data['NSIGMA_CONTRAST'][2]
@@ -311,13 +349,13 @@ class Dataset:
                     data_dict['SIMBAD_FLUX_G'] = simbad_dico['simbad_FLUX_G']
                 else:
                     data_dict['SIMBAD_FLUX_G'] = np.nan
-                    self.__missings['SIMBAD_FLUX_G'] += 1
+                    self.__missings['SIMBAD_FLUX_G'].append(folder)
                 
                 if 'simbad_FLUX_H' in simbad_dico.keys():
                     data_dict['SIMBAD_FLUX_H'] = simbad_dico['simbad_FLUX_H']
                 else:
                     data_dict['SIMBAD_FLUX_H'] = np.nan
-                    self.__missings['SIMBAD_FLUX_H'] += 1
+                    self.__missings['SIMBAD_FLUX_H'].append(folder)
 
                 # Query ASM and retrieve the seeing and coherence time.
                 try:
@@ -352,10 +390,10 @@ class Dataset:
 
                 except:
 
-                    self.__missings['SEEING_MEDIAN'] += 1
-                    self.__missings['SEEING_STD'] += 1
-                    self.__missings['COHERENCE_TIME_MEDIAN'] += 1
-                    self.__missings['COHERENCE_TIME_STD'] += 1
+                    self.__missings['SEEING_MEDIAN'].append(folder)
+                    self.__missings['SEEING_STD'].append(folder)
+                    self.__missings['COHERENCE_TIME_MEDIAN'].append(folder)
+                    self.__missings['COHERENCE_TIME_STD'].append(folder)
                     data_dict['SEEING_MEDIAN'] = np.nan
                     data_dict['SEEING_STD'] = np.nan
                     data_dict['COHERENCE_TIME_MEDIAN'] = np.nan
@@ -374,7 +412,7 @@ class Dataset:
         # Write in a file the max date of the missing data along with the min date of the non missing data.
         with open(os.path.join(self.__path, 'missing_data_dates_summary.txt'), 'w') as f:
             for header in self.__header_list:
-                if self.__missings[header] != 0:
+                if len(self.__missings[header]) != 0:
                     f.write("{} : \nmax date of the missing values = {} \nmin date of the non missing values = {} \n\n".format(\
                         header, max(self.__dates_missing_dict[header]), min(self.__dates_not_missing_dict[header])))
 
