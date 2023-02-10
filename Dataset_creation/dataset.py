@@ -232,7 +232,9 @@ class Dataset:
             'ESO TEL AIRM MEAN', 'EFF_NFRA', 'EFF_ETIM', 'SR_AVG', 'ESO INS4 FILT3 NAME', \
                 'ESO INS4 OPTI22 NAME', 'ESO AOS VISWFS MODE', 'ESO TEL AMBI WINDSP', 'SCFOVROT', 'SC MODE', \
                     'ESO TEL AMBI RHUM', 'HIERARCH ESO INS4 TEMP422 VAL', 'HIERARCH ESO TEL TH M1 TEMP', \
-                        'HIERARCH ESO TEL AMBI TEMP', 'OBS_STA', 'OBS_END']
+                        'HIERARCH ESO TEL AMBI TEMP', 'OBS_STA', 'OBS_END', 'ESO DET NDIT', 'ESO DET SEQ1 DIT']
+
+        # 'ESO OBS START', 'ESO TPL START' 
         
         self.__folder_names = get_folder_names(path)
         self.__filename='ird_specal_dc-IRD_SPECAL_CONTRAST_CURVE_TABLE-contrast_curve_tab.fits'
@@ -316,8 +318,20 @@ class Dataset:
                                 f.write("Folder : {}\nDate: {}\n\n".format(folder, fits_headers['DATE']))
 
                         # Add the folder name to the missing list.
-                        data_dict[header] = np.nan
+                        data_dict[header] = None
                         self.__missings[header].append(folder)
+
+                # Add the recovered version of OBS_STA and OBS_END
+                try:
+                    data_dict['OBS_STA_RECOV'] = Time(fits_headers['ESO OBS START'])
+                    time_interval = fits_headers['ESO DET SEQ1 DIT'] * fits_headers['ESO DET NDIT']
+                    data_dict['OBS_END_RECOV'] = Time(data_dict['OBS_STA_RECOV']) + TimeDelta(time_interval, format='sec')
+
+                except:
+                    data_dict['OBS_STA_RECOV'] = None
+                    data_dict['OBS_END_RECOV'] = None
+                    self.__missings['OBS_STA_RECOV'].append(folder)
+                    self.__missings['OBS_END_RECOV'].append(folder)
 
                 separation = fits_data['SEPARATION'][2] # Combination of the two cameras (I think)
                 contrast = fits_data['NSIGMA_CONTRAST'][2]
@@ -348,21 +362,25 @@ class Dataset:
                 if 'simbad_FLUX_G' in simbad_dico.keys():
                     data_dict['SIMBAD_FLUX_G'] = simbad_dico['simbad_FLUX_G']
                 else:
-                    data_dict['SIMBAD_FLUX_G'] = np.nan
+                    data_dict['SIMBAD_FLUX_G'] = None
                     self.__missings['SIMBAD_FLUX_G'].append(folder)
                 
                 if 'simbad_FLUX_H' in simbad_dico.keys():
                     data_dict['SIMBAD_FLUX_H'] = simbad_dico['simbad_FLUX_H']
                 else:
-                    data_dict['SIMBAD_FLUX_H'] = np.nan
+                    data_dict['SIMBAD_FLUX_H'] = None
                     self.__missings['SIMBAD_FLUX_H'].append(folder)
 
                 # Query ASM and retrieve the seeing and coherence time.
                 try:
                     # We add 15 minutes to the start and end of the observation to be sure to retrieve data.
                     # The observation can be shorter than the non-consistant delta time of the ASM.
-                    start = Time(data_dict['OBS_STA']) - TimeDelta(900, format='sec')
-                    stop = Time(data_dict['OBS_END']) + TimeDelta(900, format='sec')
+                    if data_dict['OBS_STA'] is None or data_dict['OBS_END'] is None:
+                        start = Time(data_dict['OBS_STA_RECOV']) - TimeDelta(900, format='sec')
+                        stop = Time(data_dict['OBS_END_RECOV']) + TimeDelta(900, format='sec')
+                    else:
+                        start = Time(data_dict['OBS_STA']) - TimeDelta(900, format='sec')
+                        stop = Time(data_dict['OBS_END']) + TimeDelta(900, format='sec')
 
                     # If the observation is before 2 april 2016, we use the old query.
                     # Else, we use the new query.
@@ -379,8 +397,12 @@ class Dataset:
                         coherence_time = pd.DataFrame(asm_data['MASS-DIMM Tau0 [s]'])
 
                     # Interpolate the data to have a consistant step size of 1 minute.
-                    seeing = self.__interpolate_dates(seeing, 'Date time', data_dict['OBS_STA'], data_dict['OBS_END'])
-                    coherence_time = self.__interpolate_dates(coherence_time, 'Date time', data_dict['OBS_STA'], data_dict['OBS_END'])
+                    if data_dict['OBS_STA'] is None or data_dict['OBS_END'] is None:
+                        seeing = self.__interpolate_dates(seeing, 'Date time', data_dict['OBS_STA_RECOV'], data_dict['OBS_END_RECOV'])
+                        coherence_time = self.__interpolate_dates(coherence_time, 'Date time', data_dict['OBS_STA_RECOV'], data_dict['OBS_END_RECOV'])
+                    else:
+                        seeing = self.__interpolate_dates(seeing, 'Date time', data_dict['OBS_STA'], data_dict['OBS_END'])
+                        coherence_time = self.__interpolate_dates(coherence_time, 'Date time', data_dict['OBS_STA'], data_dict['OBS_END'])
 
                     # Compute the median and std of the seeing and coherence time.
                     data_dict['SEEING_MEDIAN'] = seeing.median()
@@ -398,6 +420,10 @@ class Dataset:
                     data_dict['SEEING_STD'] = np.nan
                     data_dict['COHERENCE_TIME_MEDIAN'] = np.nan
                     data_dict['COHERENCE_TIME_STD'] = np.nan
+                    # if data_dict['OBS_STA'] is None or data_dict['OBS_END'] is None:
+                    #     print("No ASM data between \t {} and {}".format(data_dict['OBS_STA_RECOV'], data_dict['OBS_END_RECOV']))
+                    # else:
+                    #     print("No ASM data between \t {} and {}".format(data_dict['OBS_STA'], data_dict['OBS_END']))
               
                 # Write the summary of the contrast in a file.
                 with open(os.path.join(self.__path, folder, 'contrast_summary.txt'), 'w') as f:
