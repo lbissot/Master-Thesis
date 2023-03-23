@@ -10,3 +10,5 @@ SPHERE_DC_DATA/
 sparta/
 sphere_dl_script_sparta_
 *.csv
+sparta_missings.txt
+timestamps_missings.txt
