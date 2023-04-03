@@ -46,7 +46,7 @@ class Dataset:
             print('No missing values.')
         else:
             for header in self.__missings:
-                print('{}: {:.2f}%'.format(header, len(self.__missings[header])/len(self.__folder_names)*100))
+                print('{}: {:.2f}%'.format(header, len(self.__missings[header])/len(self.__folder_names_contrast)*100))
 
     def get_missings_csv(self, filename='missings.csv'):
         """
@@ -71,7 +71,7 @@ class Dataset:
             csv_writer.writerow([''] + headers)
 
             # Write the folder names
-            for folder in self.__folder_names:
+            for folder in self.__folder_names_contrast:
                 row = [folder]
                 # In self.__missings the foldernames finish by '/'
                 folder = folder + '/'
@@ -223,6 +223,11 @@ class Dataset:
             exit('ERROR! Folder {} does not exist.'.format(path))
 
         self.__path = path
+        self.__path_contrast = os.path.join(path, 'contrast_curves')
+        # We will use the timestamps to recover the OBS_STA and OBS_END missing entries.
+        self.__path_timestamps = os.path.join(path, 'timestamps')
+        # Won't be used for now.
+        self.__path_sparta = os.path.join(path, 'sparta_sampledata')
 
         # List of fits headers to be used in the dataset.
         # 'ESO TEL AMBI FWHM MEAN', 'ESO TEL TAU0 MEAN' are not used because they are not available for all the observations.
@@ -236,8 +241,23 @@ class Dataset:
 
         # 'ESO OBS START', 'ESO TPL START' 
         
-        self.__folder_names = get_folder_names(path)
-        self.__filename='ird_specal_dc-IRD_SPECAL_CONTRAST_CURVE_TABLE-contrast_curve_tab.fits'
+        self.__folder_names_contrast = get_folder_names(self.__path_contrast)
+        self.__folder_names_timestamps = get_folder_names(self.__path_timestamps)
+        self.__folder_names_sparta = get_folder_names(self.__path_sparta)
+
+        self.__filename_contrast = 'ird_specal_dc-IRD_SPECAL_CONTRAST_CURVE_TABLE-contrast_curve_tab.fits'
+        self.__filename_timestamps = 'ird_convert_recenter_dc5-IRD_TIMESTAMP-timestamp.fits'
+        self.__filename_sparta = 'ird_convert_recenter_dc5-SPH_SPARTA_SAMPLEDDATA-sampled_sparta_data.fits'
+
+        folder_names_timestamps_split = [folder.split('_') for folder in self.__folder_names_timestamps]
+        folder_names_sparta_split = [folder.split('_') for folder in self.__folder_names_sparta]
+
+        # For each target name (*_split[:][0]) we want to replace '-' by ' '
+        for i in range(len(folder_names_timestamps_split)):
+            folder_names_timestamps_split[i][0] = folder_names_timestamps_split[i][0].replace('-', ' ')
+
+        for i in range(len(folder_names_sparta_split)):
+            folder_names_sparta_split[i][0] = folder_names_sparta_split[i][0].replace('-', ' ')
 
         # List of dictionnaries whose keys will be the same among all the dictionnaries.
         # It will then be converted into a dataframe.
@@ -258,19 +278,24 @@ class Dataset:
             # List of the dates of the not missing headers (to retrieve min and max dates)
             self.__dates_not_missing_dict[header] = []
 
-        # Not in header list as it is not a fits header but a query to make.
-        self.__missings['SIMBAD_FLUX_G'] = []
-        self.__missings['SIMBAD_FLUX_H'] = []
-        self.__missings['SEEING_MEDIAN'] = []
-        self.__missings['SEEING_STD'] = []
-        self.__missings['COHERENCE_TIME_MEDIAN'] = []
-        self.__missings['COHERENCE_TIME_STD'] = []
+        # Not in header list as it is not a fits header.
+        not_a_header = ['SIMBAD_FLUX_G', 'SIMBAD_FLUX_H', 'SEEING_MEDIAN', 'SEEING_STD', \
+            'COHERENCE_TIME_MEDIAN', 'COHERENCE_TIME_STD', 'OBS_STA_TIMESTAMPS', \
+                'OBS_END_TIMESTAMPS'] #, 'OBS_STA_SPARTA', 'OBS_END_SPARTA']
+
+        for nah in not_a_header:
+            self.__missings[nah] = []
+        
 
         print('Creating the dataset...')
-        for folder in tqdm(self.__folder_names):
+        for folder in tqdm(self.__folder_names_contrast):
+
+            folder_name_split = folder.split('_')
+            folder_name_split[0] = folder_name_split[0].replace('-', ' ')
+
             folder = folder + '/'
 
-            with fits.open(os.path.join(path, folder, self.__filename)) as hdul:
+            with fits.open(os.path.join(self.__path_contrast, folder, self.__filename_contrast)) as hdul:
                 fits_data = hdul[1].data
                 fits_headers = hdul[1].header  
 
@@ -278,7 +303,7 @@ class Dataset:
                 if write:
                     with warnings.catch_warnings():
                         warnings.simplefilter("ignore")
-                        self.__write_headers_in_file(os.path.join(path, folder), fits_headers)
+                        self.__write_headers_in_file(os.path.join(self.__path_contrast, folder), fits_headers)
 
                 data_dict = {}
                 
@@ -311,10 +336,10 @@ class Dataset:
                         # If first encountered missing header, create the file and write the folder name.
                         # Else, append the folder name to the file.
                         if self.__missings[header] == 0:
-                            with open(os.path.join(path, "{}_missing.txt".format(header)), 'w') as f:
+                            with open(os.path.join(self.__path_contrast, "{}_missing.txt".format(header)), 'w') as f:
                                 f.write("Folder : {}\nDate: {}\n\n".format(folder, fits_headers['DATE']))
                         else:
-                            with open(os.path.join(path, "{}_missing.txt".format(header)), 'a') as f:
+                            with open(os.path.join(self.__path_contrast, "{}_missing.txt".format(header)), 'a') as f:
                                 f.write("Folder : {}\nDate: {}\n\n".format(folder, fits_headers['DATE']))
 
                         # Add the folder name to the missing list.
@@ -322,16 +347,36 @@ class Dataset:
                         self.__missings[header].append(folder)
 
                 # Add the recovered version of OBS_STA and OBS_END
-                try:
-                    data_dict['OBS_STA_RECOV'] = Time(fits_headers['ESO OBS START'])
-                    time_interval = fits_headers['ESO DET SEQ1 DIT'] * fits_headers['ESO DET NDIT']
-                    data_dict['OBS_END_RECOV'] = Time(data_dict['OBS_STA_RECOV']) + TimeDelta(time_interval, format='sec')
+                # 1. Match the folder name with the folder name in the timestamps and sparta folders
 
-                except:
-                    data_dict['OBS_STA_RECOV'] = None
-                    data_dict['OBS_END_RECOV'] = None
-                    self.__missings['OBS_STA_RECOV'].append(folder)
-                    self.__missings['OBS_END_RECOV'].append(folder)
+                # Indicator of whether we find a matching folder name in the timestamps or not
+                # (based on target name and date).
+                timestamp_miss = True
+
+                for j, timestamps_folder in enumerate(self.__folder_names_timestamps):
+                        if folder_name_split[0] == folder_names_timestamps_split[j][0] and \
+                            folder_name_split[3] == folder_names_timestamps_split[j][3]:
+
+                            timestamp_miss = False
+
+                            try:
+                                with fits.open(os.path.join(self.__path_timestamps, timestamps_folder, self.__filename_timestamps)) as hdul_timestamps:
+                                    # The offset is actually the modified julian day of the observation
+                                    offset = hdul_timestamps[0].header['SUBTRACT']
+                                    data_dict['OBS_STA_TIMESTAMPS'] = hdul_timestamps[0].data[0] + offset
+                                    data_dict['OBS_END_TIMESTAMPS'] = hdul_timestamps[0].data[-1] + offset
+
+                                    # Convert the MJD to a datetime object in isot format.
+                                    data_dict['OBS_STA_TIMESTAMPS'] = Time(data_dict['OBS_STA_TIMESTAMPS'], format='mjd').isot
+                                    data_dict['OBS_END_TIMESTAMPS'] = Time(data_dict['OBS_END_TIMESTAMPS'], format='mjd').isot
+                            except:
+                                timestamp_miss = True
+
+                if timestamp_miss:
+                    data_dict['OBS_STA_TIMESTAMPS'] = None
+                    data_dict['OBS_END_TIMESTAMPS'] = None
+                    self.__missings['OBS_STA_TIMESTAMPS'].append(folder)
+                    self.__missings['OBS_END_TIMESTAMPS'].append(folder)
 
                 separation = fits_data['SEPARATION'][2] # Combination of the two cameras (I think)
                 contrast = fits_data['NSIGMA_CONTRAST'][2]
@@ -387,12 +432,12 @@ class Dataset:
                     # with HiddenPrints():
                     if start < Time('2016-04-02T00:00:00.000', format='isot'):
                         with HiddenPrints():
-                            asm_data = qea.query_old_dimm(os.path.join(self.__path, folder), str(start), str(stop))
+                            asm_data = qea.query_old_dimm(os.path.join(self.__path_contrast, folder), str(start), str(stop))
                         seeing = pd.DataFrame(asm_data['DIMM Seeing ["]'])
                         coherence_time = pd.DataFrame(asm_data['Tau0 [s]'])
                     else:
                         with HiddenPrints():
-                            asm_data = qea.query_mass(os.path.join(self.__path, folder), str(start), str(stop))
+                            asm_data = qea.query_mass(os.path.join(self.__path_contrast, folder), str(start), str(stop))
                         seeing = pd.DataFrame(asm_data['MASS-DIMM Seeing ["]'])
                         coherence_time = pd.DataFrame(asm_data['MASS-DIMM Tau0 [s]'])
 
@@ -426,7 +471,7 @@ class Dataset:
                     #     print("No ASM data between \t {} and {}".format(data_dict['OBS_STA'], data_dict['OBS_END']))
               
                 # Write the summary of the contrast in a file.
-                with open(os.path.join(self.__path, folder, 'contrast_summary.txt'), 'w') as f:
+                with open(os.path.join(self.__path_contrast, folder, 'contrast_summary.txt'), 'w') as f:
                     try:
                         f.write(get_vector_summary_table(data_dict['NSIGMA_CONTRAST'], 'NSIGMA_CONTRAST'))
                     except:
@@ -436,7 +481,7 @@ class Dataset:
                 data_dict_list.append(data_dict)
 
         # Write in a file the max date of the missing data along with the min date of the non missing data.
-        with open(os.path.join(self.__path, 'missing_data_dates_summary.txt'), 'w') as f:
+        with open(os.path.join(self.__path_contrast, 'missing_data_dates_summary.txt'), 'w') as f:
             for header in self.__header_list:
                 if len(self.__missings[header]) != 0:
                     f.write("{} : \nmax date of the missing values = {} \nmin date of the non missing values = {} \n\n".format(\
@@ -470,7 +515,7 @@ class Dataset:
             print('Creating the contrast plots...')
             dict_df = self.__df.to_dict()
             for i in tqdm(range(len(dict_df['folder']))):
-                self.__plot_contrast(os.path.join(path, dict_df['folder'][i]), dict_df['SEPARATION'][i], dict_df['NSIGMA_CONTRAST'][i], dict_df['OBJECT'][i])
+                self.__plot_contrast(os.path.join(self.__path_contrast, dict_df['folder'][i]), dict_df['SEPARATION'][i], dict_df['NSIGMA_CONTRAST'][i], dict_df['OBJECT'][i])
 
 
     def __write_headers_in_file(self, path, fits_headers, filename='headers.txt', table_format='psql'):
