@@ -418,11 +418,12 @@ class Dataset:
 
                 # Query ASM and retrieve the seeing and coherence time.
                 try:
+
                     # We add 15 minutes to the start and end of the observation to be sure to retrieve data.
                     # The observation can be shorter than the non-consistant delta time of the ASM.
                     if data_dict['OBS_STA'] is None or data_dict['OBS_END'] is None:
-                        start = Time(data_dict['OBS_STA_RECOV']) - TimeDelta(900, format='sec')
-                        stop = Time(data_dict['OBS_END_RECOV']) + TimeDelta(900, format='sec')
+                        start = Time(data_dict['OBS_STA_TIMESTAMPS']) - TimeDelta(900, format='sec')
+                        stop = Time(data_dict['OBS_END_TIMESTAMPS']) + TimeDelta(900, format='sec')
                     else:
                         start = Time(data_dict['OBS_STA']) - TimeDelta(900, format='sec')
                         stop = Time(data_dict['OBS_END']) + TimeDelta(900, format='sec')
@@ -443,8 +444,8 @@ class Dataset:
 
                     # Interpolate the data to have a consistant step size of 1 minute.
                     if data_dict['OBS_STA'] is None or data_dict['OBS_END'] is None:
-                        seeing = self.__interpolate_dates(seeing, 'Date time', data_dict['OBS_STA_RECOV'], data_dict['OBS_END_RECOV'])
-                        coherence_time = self.__interpolate_dates(coherence_time, 'Date time', data_dict['OBS_STA_RECOV'], data_dict['OBS_END_RECOV'])
+                        seeing = self.__interpolate_dates(seeing, 'Date time', data_dict['OBS_STA_TIMESTAMPS'], data_dict['OBS_END_TIMESTAMPS'])
+                        coherence_time = self.__interpolate_dates(coherence_time, 'Date time', data_dict['OBS_STA_TIMESTAMPS'], data_dict['OBS_END_TIMESTAMPS'])
                     else:
                         seeing = self.__interpolate_dates(seeing, 'Date time', data_dict['OBS_STA'], data_dict['OBS_END'])
                         coherence_time = self.__interpolate_dates(coherence_time, 'Date time', data_dict['OBS_STA'], data_dict['OBS_END'])
@@ -456,7 +457,6 @@ class Dataset:
                     data_dict['COHERENCE_TIME_STD'] = coherence_time.std()
 
                 except:
-
                     self.__missings['SEEING_MEDIAN'].append(folder)
                     self.__missings['SEEING_STD'].append(folder)
                     self.__missings['COHERENCE_TIME_MEDIAN'].append(folder)
@@ -465,11 +465,7 @@ class Dataset:
                     data_dict['SEEING_STD'] = np.nan
                     data_dict['COHERENCE_TIME_MEDIAN'] = np.nan
                     data_dict['COHERENCE_TIME_STD'] = np.nan
-                    # if data_dict['OBS_STA'] is None or data_dict['OBS_END'] is None:
-                    #     print("No ASM data between \t {} and {}".format(data_dict['OBS_STA_RECOV'], data_dict['OBS_END_RECOV']))
-                    # else:
-                    #     print("No ASM data between \t {} and {}".format(data_dict['OBS_STA'], data_dict['OBS_END']))
-              
+                    
                 # Write the summary of the contrast in a file.
                 with open(os.path.join(self.__path_contrast, folder, 'contrast_summary.txt'), 'w') as f:
                     try:
