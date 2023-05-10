@@ -239,8 +239,6 @@ class Dataset:
                     'ESO TEL AMBI RHUM', 'HIERARCH ESO INS4 TEMP422 VAL', 'HIERARCH ESO TEL TH M1 TEMP', \
                         'HIERARCH ESO TEL AMBI TEMP', 'OBS_STA', 'OBS_END', 'ESO DET NDIT', 'ESO DET SEQ1 DIT']
 
-        # 'ESO OBS START', 'ESO TPL START' 
-        
         self.__folder_names_contrast = get_folder_names(self.__path_contrast)
         self.__folder_names_timestamps = get_folder_names(self.__path_timestamps)
         self.__folder_names_sparta = get_folder_names(self.__path_sparta)
@@ -369,6 +367,9 @@ class Dataset:
                                     # Convert the MJD to a datetime object in isot format.
                                     data_dict['OBS_STA_TIMESTAMPS'] = Time(data_dict['OBS_STA_TIMESTAMPS'], format='mjd').isot
                                     data_dict['OBS_END_TIMESTAMPS'] = Time(data_dict['OBS_END_TIMESTAMPS'], format='mjd').isot
+
+                                    # Will be used to investiguate weird values.
+                                    data_dict['TIMESTAMPS_DIR'] = timestamps_folder
                             except:
                                 timestamp_miss = True
 
@@ -451,10 +452,10 @@ class Dataset:
                         coherence_time = self.__interpolate_dates(coherence_time, 'Date time', data_dict['OBS_STA'], data_dict['OBS_END'])
 
                     # Compute the median and std of the seeing and coherence time.
-                    data_dict['SEEING_MEDIAN'] = seeing.median()
-                    data_dict['SEEING_STD'] = seeing.std()
-                    data_dict['COHERENCE_TIME_MEDIAN'] = coherence_time.median()
-                    data_dict['COHERENCE_TIME_STD'] = coherence_time.std()
+                    data_dict['SEEING_MEDIAN'] = seeing.median().values[0]
+                    data_dict['SEEING_STD'] = seeing.std().values[0]
+                    data_dict['COHERENCE_TIME_MEDIAN'] = coherence_time.median().values[0]
+                    data_dict['COHERENCE_TIME_STD'] = coherence_time.std().values[0]
 
                 except:
                     self.__missings['SEEING_MEDIAN'].append(folder)
@@ -505,6 +506,16 @@ class Dataset:
         # Replace columns in the dataframe
         self.__df['SEPARATION'] = new_sep
         self.__df['NSIGMA_CONTRAST'] = new_contrast
+
+        # List of the columns names where the data is categorical (string)
+        col_categ = ['ESO INS4 FILT3 NAME', 'ESO INS4 OPTI22 NAME', 'ESO AOS VISWFS MODE', 'SC MODE']
+
+        # Lower case all the categorical data and remove spaces and underscores
+        for col in col_categ:
+            self.__df[col] = self.__df[col].str.lower()
+            self.__df[col] = self.__df[col].str.replace(' ', '')
+            self.__df[col] = self.__df[col].str.replace('_', '')
+            self.__df[col] = self.__df[col].str.replace('-', '')
 
         # Plot the contrast curves (in files)
         if plot:
