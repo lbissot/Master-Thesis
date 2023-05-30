@@ -12,7 +12,7 @@ DEBUG = True
 mode = 'contrast_curves'
 
 # Path to the folder containing the sphere_dl_script
-path_data = 'C:/Users/ludin/Documents/Master Thesis/Dataset_creation/Download Scripts/'
+path_data = '/Users/ludo/Documents/TFE/Master-Thesis/Dataset_creation/Download Scripts'
 
 if mode == 'contrast_curves':
     target_name = 'sphere_dl_script_contrast_curves.sh'

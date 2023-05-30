@@ -227,7 +227,7 @@ class Dataset:
         # We will use the timestamps to recover the OBS_STA and OBS_END missing entries.
         self.__path_timestamps = os.path.join(path, 'timestamps')
         # Won't be used for now.
-        self.__path_sparta = os.path.join(path, 'sparta_sampledata')
+        self.__path_sparta = os.path.join(path, 'sparta_sampleddata')
 
         # List of fits headers to be used in the dataset.
         # 'ESO TEL AMBI FWHM MEAN', 'ESO TEL TAU0 MEAN' are not used because they are not available for all the observations.
@@ -355,21 +355,31 @@ class Dataset:
                         if folder_name_split[0] == folder_names_timestamps_split[j][0] and \
                             folder_name_split[3] == folder_names_timestamps_split[j][3]:
 
-                            timestamp_miss = False
-
                             try:
                                 with fits.open(os.path.join(self.__path_timestamps, timestamps_folder, self.__filename_timestamps)) as hdul_timestamps:
-                                    # The offset is actually the modified julian day of the observation
-                                    offset = hdul_timestamps[0].header['SUBTRACT']
-                                    data_dict['OBS_STA_TIMESTAMPS'] = hdul_timestamps[0].data[0] + offset
-                                    data_dict['OBS_END_TIMESTAMPS'] = hdul_timestamps[0].data[-1] + offset
+                                    # Check whether the headers UTC or LST match
+                                    try:
+                                        timestamp_UTC = hdul_timestamps[0].header['UTC']
+                                        timestamp_LST = hdul_timestamps[0].header['LST']
+                                        contrast_UTC = fits_headers['UTC']
+                                        contrast_LST = fits_headers['LST']
+                                    except:
+                                        print("UTC or LST missing in the timestamps header {}".format(timestamps_folder))
 
-                                    # Convert the MJD to a datetime object in isot format.
-                                    data_dict['OBS_STA_TIMESTAMPS'] = Time(data_dict['OBS_STA_TIMESTAMPS'], format='mjd').isot
-                                    data_dict['OBS_END_TIMESTAMPS'] = Time(data_dict['OBS_END_TIMESTAMPS'], format='mjd').isot
+                                    if timestamp_UTC == contrast_UTC or timestamp_LST == contrast_LST:
+                                        # The offset is actually the modified julian day of the observation
+                                        offset = hdul_timestamps[0].header['SUBTRACT']
+                                        data_dict['OBS_STA_TIMESTAMPS'] = hdul_timestamps[0].data[0] + offset
+                                        data_dict['OBS_END_TIMESTAMPS'] = hdul_timestamps[0].data[-1] + offset
 
-                                    # Will be used to investiguate weird values.
-                                    data_dict['TIMESTAMPS_DIR'] = timestamps_folder
+                                        # Convert the MJD to a datetime object in isot format.
+                                        data_dict['OBS_STA_TIMESTAMPS'] = Time(data_dict['OBS_STA_TIMESTAMPS'], format='mjd').isot
+                                        data_dict['OBS_END_TIMESTAMPS'] = Time(data_dict['OBS_END_TIMESTAMPS'], format='mjd').isot
+
+                                        # Will be used to investiguate weird values.
+                                        data_dict['TIMESTAMPS_DIR'] = timestamps_folder
+
+                                        timestamp_miss = False
                             except:
                                 timestamp_miss = True
 
