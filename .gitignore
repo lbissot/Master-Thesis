@@ -12,3 +12,5 @@ sphere_dl_script_sparta_
 *.csv
 sparta_missings.txt
 timestamps_missings.txt
+wandb/
+*.html
