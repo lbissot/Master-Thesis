@@ -1,0 +1,4 @@
+/Users/ludo/Documents/TFE/Master-Thesis/Dataset_creation/SPHERE_DC_DATAHIP-10138_DB_H23_2014-10-11_ird_specal_dc_cADI_softsorting_201183/
+/Users/ludo/Documents/TFE/Master-Thesis/Dataset_creation/SPHERE_DC_DATAHIP-10138_DB_H23_2014-10-11_ird_specal_dc_cADI_softsorting_201184/
+/Users/ludo/Documents/TFE/Master-Thesis/Dataset_creation/SPHERE_DC_DATAHIP-10138_DB_H23_2014-10-11_ird_specal_dc_cADI_softsorting_201185/
+/Users/ludo/Documents/TFE/Master-Thesis/Dataset_creation/SPHERE_DC_DATAHIP-10138_DB_H23_2014-10-11_ird_specal_dc_cADI_softsorting_201182/

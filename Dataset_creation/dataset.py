@@ -507,7 +507,11 @@ class Dataset:
         max_sep = np.min(self.__df['SEPARATION'].apply(lambda x: np.max(x)))
 
         # Create the new separation array
-        new_sep = np.linspace(min_sep, max_sep, n_points)
+        # Logarithmic spacing in order to put more points at small separations
+        log_vals = np.logspace(min_sep, max_sep, num=n_points, base=2)
+
+        # Transform the log values in such a way that thy are between start and stop
+        new_sep = (log_vals - log_vals.min()) / (log_vals.max() - log_vals.min()) * (max_sep - min_sep) + min_sep
 
         # Interpolate the contrast curves
         new_contrast = self.__df.apply(lambda x: np.interp(new_sep, x['SEPARATION'], x['NSIGMA_CONTRAST']), axis=1)
