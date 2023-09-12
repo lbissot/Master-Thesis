@@ -14,3 +14,4 @@ sparta_missings.txt
 timestamps_missings.txt
 wandb/
 *.html
+*.pth
