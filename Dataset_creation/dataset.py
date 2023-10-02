@@ -109,7 +109,7 @@ class Dataset:
         deviations = []
 
         for curve in contrast_curves:
-            deviation = np.sum(np.abs(curve - median))
+            deviation = np.mean(np.abs(curve - median))
             deviations.append(deviation)
 
         return np.array(deviations)
@@ -321,7 +321,13 @@ class Dataset:
 
                         elif header == 'SCFOVROT':
                             data_dict[header] = fits_headers[header] % 180
-
+                        elif header.startswith('HIERARCH'):
+                            try:
+                                data_dict[header] = fits_headers[header]
+                            except:
+                                # Remove the 'HIERARCH ' part of the header
+                                header_renamed = header[9:]
+                                data_dict[header] = fits_headers[header_renamed]
                         else:
                             data_dict[header] = fits_headers[header]
 
@@ -333,12 +339,15 @@ class Dataset:
                         # Create a file named 'header_missing.txt' with the folders where the header is missing.
                         # If first encountered missing header, create the file and write the folder name.
                         # Else, append the folder name to the file.
-                        if self.__missings[header] == 0:
-                            with open(os.path.join(self.__path_contrast, "{}_missing.txt".format(header)), 'w') as f:
-                                f.write("Folder : {}\nDate: {}\n\n".format(folder, fits_headers['DATE']))
-                        else:
-                            with open(os.path.join(self.__path_contrast, "{}_missing.txt".format(header)), 'a') as f:
-                                f.write("Folder : {}\nDate: {}\n\n".format(folder, fits_headers['DATE']))
+                        try:
+                            if len(self.__missings[header]) == 0:
+                                with open(os.path.join(self.__path_contrast, "{}_missing.txt".format(header)), 'w') as f:
+                                    f.write("Folder : {}\nDate: {}\n\n".format(folder, fits_headers['DATE']))
+                            else:
+                                with open(os.path.join(self.__path_contrast, "{}_missing.txt".format(header)), 'a') as f:
+                                    f.write("Folder : {}\nDate: {}\n\n".format(folder, fits_headers['DATE']))
+                        except:
+                            print("Error while writing the missing header file for the header {}".format(header))
 
                         # Add the folder name to the missing list.
                         data_dict[header] = None

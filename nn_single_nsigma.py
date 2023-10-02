@@ -6,9 +6,11 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR
-from sklearn.impute import SimpleImputer
+from sklearn.impute import KNNImputer
 from sklearn.preprocessing import StandardScaler
 import argparse
+import copy
+import datetime
 
 # Define the model
 class MLP(nn.Sequential):
@@ -24,18 +26,6 @@ class MLP(nn.Sequential):
         layers.append(nn.Linear(hidden_features, output_features))
         
         super().__init__(*layers)
-
-        # self.initialize_weights()
-
-    # He initialization (since we are using ReLU activations)
-    def initialize_weights(self):
-        for layer in self:
-            if isinstance(layer, nn.Linear):
-                n_in = layer.in_features
-                # He initialization for ReLU activations
-                std_dev = np.sqrt(2 / n_in)
-                layer.weight.data.normal_(0, std_dev)
-                layer.bias.data.fill_(0)
 
 
 def reshape_dataframe(df, vec_column_name_list):
@@ -96,7 +86,12 @@ def model_pipeline(hyperparameters):
 
         # make the data
         print("Making the data...")
-        x_train_tensor, y_train_log_tensor, x_test_tensor, y_test_log_tensor = make_data(df_AD, config)
+        x_train_tensor, y_train_log_tensor, \
+            x_test_tensor, y_test_log_tensor, \
+                x_valid_tensor, y_valid_tensor = make_data(df_AD, config)
+
+        if x_train_tensor.shape[0] % config.batch_size != 0:
+            raise ValueError("The number of observations in the training set ({}) must be a multiple of the batch size ({})".format(x_train_tensor.shape[0], config.batch_size))
 
         # make the model, data, and optimization problem
         model, criterion, optimizer = make(config)
@@ -104,13 +99,23 @@ def model_pipeline(hyperparameters):
 
         # and use them to train the model
         print("Training the model...")
-        train(model, x_train_tensor, y_train_log_tensor, criterion, optimizer, config)
+        train(model, x_train_tensor, y_train_log_tensor, x_valid_tensor, y_valid_tensor, criterion, optimizer, config)
+        print("Done training!")
+
+        # load the best model according to the validation set
+        best_model = MLP(
+            input_features=len(config.features_to_keep) - 1, # Don't forget to remove the target feature
+            output_features=1,
+            hidden_features=config.hidden_size,
+            num_hidden_layers=config.n_hidden_layers
+            ).to(device)
+        best_model.load_state_dict(torch.load(config.model_name))
 
         # and test its final performance
         print("Testing the model...")
-        test(model, x_test_tensor, y_test_log_tensor, config)
+        test(best_model, x_test_tensor, y_test_log_tensor, config)
 
-    return model, x_train_tensor, y_train_log_tensor, x_test_tensor, y_test_log_tensor
+    return best_model, x_train_tensor, y_train_log_tensor, x_test_tensor, y_test_log_tensor, x_valid_tensor, y_valid_tensor
 
 
 def make_data(df_AD, config):
@@ -139,18 +144,22 @@ def make_data(df_AD, config):
     # Replace every separation vectors with the new one
     df_AD.loc[:, 'SEPARATION'] = df_AD['SEPARATION'].apply(lambda x: np.array(x) / np.max(x))
 
-    # Split the data into train and test sets
+    # Split the data into train, validation and test sets
     train = df_AD.sample(frac=0.8, random_state=config.random_state)
-    test = df_AD.drop(train.index)
+    validation = df_AD.drop(train.index)
+    test = validation.sample(frac=0.5, random_state=config.random_state)
+    validation = validation.drop(test.index)
 
     # Transform the NaN values into the median of the column of the training set (only for the numerical features)
-    imp = SimpleImputer(strategy='median')
+    imp = KNNImputer(n_neighbors=5, weights='uniform')
     train[numerical_features] = imp.fit_transform(train[numerical_features])
     test[numerical_features] = imp.transform(test[numerical_features])
+    validation[numerical_features] = imp.transform(validation[numerical_features])
 
     # Reshape the dataframes (note that the reshape is done after the train/test split to avoid data leakage)
     train = reshape_dataframe(train, ['SEPARATION', 'NSIGMA_CONTRAST'])
     test = reshape_dataframe(test, ['SEPARATION', 'NSIGMA_CONTRAST'])
+    validation = reshape_dataframe(validation, ['SEPARATION', 'NSIGMA_CONTRAST'])
 
     # Split the data into features and labels
     x_train = train.drop(['NSIGMA_CONTRAST'], axis=1)
@@ -159,16 +168,22 @@ def make_data(df_AD, config):
     x_test = test.drop(['NSIGMA_CONTRAST'], axis=1)
     y_test = test['NSIGMA_CONTRAST']
 
+    x_validation = validation.drop(['NSIGMA_CONTRAST'], axis=1)
+    y_validation = validation['NSIGMA_CONTRAST']
+
     # Standardize the data
     scaler = StandardScaler()
     x_train[numerical_features] = scaler.fit_transform(x_train[numerical_features])
     x_test[numerical_features] = scaler.transform(x_test[numerical_features])
+    x_validation[numerical_features] = scaler.transform(x_validation[numerical_features])
 
     # Convert the dataframes to numpy arrays
     x_train = (x_train.values).astype(np.float32)
     y_train = np.array(y_train.tolist()).astype(np.float32)
     x_test = (x_test.values).astype(np.float32)
     y_test = np.array(y_test.tolist()).astype(np.float32)
+    x_validation = (x_validation.values).astype(np.float32)
+    y_validation = np.array(y_validation.tolist()).astype(np.float32)
 
     # Get the number of points to keep
     n_points = config.n_obs_train * len(separation)
@@ -178,8 +193,10 @@ def make_data(df_AD, config):
     y_train_tensor = torch.tensor(np.log10(y_train[:n_points]), dtype=torch.float32)
     x_test_tensor = torch.tensor(x_test[:n_points], dtype=torch.float32)
     y_test_tensor = torch.tensor(np.log10(y_test[:n_points]), dtype=torch.float32)
+    x_validation_tensor = torch.tensor(x_validation[:n_points], dtype=torch.float32)
+    y_validation_tensor = torch.tensor(np.log10(y_validation[:n_points]), dtype=torch.float32)
 
-    return x_train_tensor, y_train_tensor, x_test_tensor, y_test_tensor
+    return x_train_tensor, y_train_tensor, x_test_tensor, y_test_tensor, x_validation_tensor, y_validation_tensor
 
 
 def make(config):
@@ -201,20 +218,20 @@ def make(config):
 
 def shuffle(x, y, config):
 
-    x_shuffled = shuffle_sequences(x, config.separation_size) # Shuffle observations or batches ???
-    y_shuffled = shuffle_sequences(y, config.separation_size)
-
+    x_shuffled, y_shuffled = shuffle_sequences(x, y, config.separation_size // 4) # Shuffle observations or batches ???
     return x_shuffled, y_shuffled
 
 
-def shuffle_sequences(X, seq_length):
+def shuffle_sequences(X, y, seq_length):
     """
-    Shuffle the order of the sequences of rows in matrix X.
+    Shuffle the order of the sequences of rows in matrix X and vector y.
 
     Parameters
     ----------
     X : torch.Tensor
         The matrix to shuffle
+    y : torch.Tensor
+        The target vector
     seq_length : int
         The length of the sequences
     """
@@ -223,39 +240,54 @@ def shuffle_sequences(X, seq_length):
     if not isinstance(X, torch.Tensor):
         raise TypeError("X must be a torch.Tensor")
 
+    # Check whether y is a torch.Tensor
+    if not isinstance(y, torch.Tensor):
+        raise TypeError("y must be a torch.Tensor")
+
     if not X.shape[0] % seq_length == 0:
         raise ValueError("The number of rows of X must be a multiple of seq_length")
+    
+    if not X.shape[0] == y.shape[0]:
+        raise ValueError("X and y must have the same number of rows")
     
     seq_indices = torch.arange(0, X.shape[0], seq_length)
     seq_indices = seq_indices[np.random.permutation(len(seq_indices))]
 
     X_shuffled = torch.empty_like(X)
+    y_shuffled = torch.empty_like(y)
     for i in range(len(seq_indices)):
         X_shuffled[i*seq_length:(i+1)*seq_length] = X[seq_indices[i]:seq_indices[i]+seq_length]
+        y_shuffled[i*seq_length:(i+1)*seq_length] = y[seq_indices[i]:seq_indices[i]+seq_length]
 
-    return X_shuffled
+    return X_shuffled, y_shuffled
 
 
-def train_log(loss, epoch, batch_ctr):
+def train_log(training_loss, validation_loss, step):
     # Where the magic happens
-    wandb.log({"epoch": epoch, "training loss": loss}, step=batch_ctr)
+    wandb.log({"training loss": training_loss, "validation loss": validation_loss}, step=step)
 
-def custom_lr_lambda(epoch, decay_rate, lr_0):
+def custom_lr_lambda_smooth(epoch, decay_rate, lr_0):
     return (1 / (1 + decay_rate * epoch)) * lr_0
 
+def custom_lr_lambda_rough(epoch, decay_rate, lr_0):
+    return lr_0 * (decay_rate ** (epoch // 10))
 
-def train(model, x, y, criterion, optimizer, config):
+def train(model, x, y, x_val, y_val, criterion, optimizer, config):
     # Tell wandb to watch what the model gets up to: gradients, weights, and more!
     wandb.watch(model, criterion, log="all", log_freq=10)
 
     batch_ctr = 0
 
-    custom_scheduler = LambdaLR(optimizer, lr_lambda=lambda epoch: custom_lr_lambda(epoch, decay_rate=config.decay_rate, lr_0=config.learning_rate))
+    custom_scheduler = LambdaLR(optimizer, lr_lambda=lambda epoch: custom_lr_lambda_rough(epoch, decay_rate=config.decay_rate, lr_0=config.learning_rate))
 
     # Run training and track with wandb
     for epoch in range(config.epochs):
+
         # Shuffle the data
         x_shuffled, y_shuffled = shuffle(x, y, config)
+        model.train()
+
+        batch_losses = []
         
         for batch_start in range(0, len(x), config.batch_size):
             # Get a batch
@@ -264,16 +296,39 @@ def train(model, x, y, criterion, optimizer, config):
             y_batch = y_shuffled[batch_start:batch_end]
 
             # Train the model
-            loss = train_batch(x_batch, y_batch, model, optimizer, criterion)
+            batch_losses.append(train_batch(x_batch, y_batch, model, optimizer, criterion).item())
 
             # Increment the batch counter
             batch_ctr += 1
 
-            # Log metrics
-            train_log(loss.item(), epoch, batch_ctr)
+        # Calculate the mean loss of the epoch
+        training_loss = np.mean(batch_losses)
+
+        # Run the model on some validation examples
+        model.eval()
+        with torch.no_grad():
+            x_val, y_val = x_val.to(device), y_val.to(device)
+            outputs = model(x_val)
+            val_loss = criterion(outputs, y_val.view(-1, 1)).item()
+        
+        # Log metrics
+        if epoch % 10 == 0:
+            print("Epoch: {} | Training loss: {} | Validation loss: {}".format(epoch, training_loss, val_loss))
+        train_log(training_loss, val_loss, epoch)
 
         # Update the scheduler at the end of each epoch
         custom_scheduler.step()
+
+        # Stopping condition
+        if epoch == 0 or val_loss < min_val_loss:
+            min_val_loss = val_loss
+            epochs_without_improvement = 0
+            torch.save(model.state_dict(), config.model_name)
+        else:
+            epochs_without_improvement += 1
+            if epochs_without_improvement == config.stop_after_epochs_without_improvement:
+                print("Early stopping")
+                break
 
 
 def train_batch(x, y, model, optimizer, criterion):
@@ -326,15 +381,35 @@ def test(model, x, y, config):
         wandb.log({"testing_mean_MSE": mean_mse, "testing_median_MSE": median_mse, "testing_mean_MAE": mean_mae, "testing_median_MAE": median_mae})
 
 
+def plot_predictions(model, X, y, idx):
+    separation = df_AD['SEPARATION'].iloc[idx]
+    
+    
+    start = idx * len(separation)
+    stop = start + len(separation)
+
+    prediction = model(X).detach().numpy()
+    prediction = prediction[start:stop]
+    contrast = y[start:stop].detach().numpy()
+    separation = X[start:stop, 1].detach().numpy()
+
+    plt.plot(separation, contrast, color='blue', label='Actual')
+    plt.plot(separation, prediction, color='red', label='Predicted')
+    plt.xlabel('Separation (arcsec)')
+    plt.ylabel('Contrast (5-sigma)')
+    plt.legend()
+    plt.show()
+
+    
 # Define the argparse setup
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Train a neural network to predict the nsigma_contrast')
 
     # Add arguments
     parser.add_argument('--epochs', type=int, default=1000, help='Number of training epochs')
-    parser.add_argument('--learning_rate', type=float, default=0.01, help='Initial learning rate')
-    parser.add_argument('--decay_rate', type=float, default=0.001, help='Decay rate of the learning rate')
-    parser.add_argument('--batch_size', type=int, default=124, help='Batch size')
+    parser.add_argument('--learning_rate', type=float, default=0.005, help='Initial learning rate')
+    parser.add_argument('--decay_rate', type=float, default=0.9, help='Decay rate of the learning rate')
+    parser.add_argument('--batch_size', type=int, default=1, help='Batch size (number of observations per batch)')
     parser.add_argument('--n_obs_train', type=int, default=1000, help='Number of observations to train on')
     parser.add_argument('--hidden_size', type=int, default=512, help='Hidden size')
     parser.add_argument('--n_hidden_layers', type=int, default=10, help='Number of hidden layers')
@@ -374,10 +449,12 @@ if __name__ == "__main__":
         n_obs_train = args.n_obs_train,
         loss_function = 'mse',
         optimizer = 'adam',
-        architecture = 'MLP',
+        architecture = 'MLP_single_nsigma',
         hidden_size = args.hidden_size,
         n_hidden_layers = args.n_hidden_layers,
         scale = 'log',
+        stop_after_epochs_without_improvement = 20,
+        model_name = "",
         
         # Data
         random_state = 42,
@@ -386,14 +463,22 @@ if __name__ == "__main__":
         separation_size = 124,  
     )
 
-    model_name = "model_dict_lr_{}_bs_{}_n_obs_train_{}_hidden_size_{}_n_hidden_layers_{}.pth".format(args.learning_rate, args.batch_size, args.n_obs_train, args.hidden_size, args.n_hidden_layers)
+    # Get the date and time of the run to name the model
+    now = datetime.datetime.now()
+    run_config['model_name'] = "{}_{}_{}_{}_{}_{}_{}.pth".format(run_config['architecture'], now.year, now.month, now.day, now.hour, now.minute, now.second)
+
+    # Change the batch size to be the number of points per batch instead of the number of observations per batch
+    run_config['batch_size'] = run_config['batch_size'] * run_config['separation_size']
 
     # Define the device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print("Device : {}".format(device))
 
     # Build, train and analyze the model with the pipeline
-    model, x_train_tensor, y_train_log_tensor, x_test_tensor, y_test_log_tensor = model_pipeline(run_config)
+    model, \
+        x_train_tensor, y_train_log_tensor, \
+            x_test_tensor, y_test_log_tensor, \
+                x_valid_tensor, y_valid_tensor = model_pipeline(run_config)
 
     # Save the model
-    torch.save(model.state_dict(), model_name)
+    torch.save(model.state_dict(), run_config['model_name'])
