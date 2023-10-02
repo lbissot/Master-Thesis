@@ -137,10 +137,10 @@ def make_data(df_AD, config):
     # Convert the data to tensors
     x_train_tensor = torch.tensor(x_train[:n_points], dtype=torch.float32)
     y_train_tensor = torch.tensor(np.log10(y_train[:n_points]), dtype=torch.float32)
-    x_test_tensor = torch.tensor(x_test[:n_points], dtype=torch.float32)
-    y_test_tensor = torch.tensor(np.log10(y_test[:n_points]), dtype=torch.float32)
-    x_validation_tensor = torch.tensor(x_validation[:n_points], dtype=torch.float32)
-    y_validation_tensor = torch.tensor(np.log10(y_validation[:n_points]), dtype=torch.float32)
+    x_test_tensor = torch.tensor(x_test, dtype=torch.float32)
+    y_test_tensor = torch.tensor(np.log10(y_test), dtype=torch.float32)
+    x_validation_tensor = torch.tensor(x_validation, dtype=torch.float32)
+    y_validation_tensor = torch.tensor(np.log10(y_validation), dtype=torch.float32)
 
     return x_train_tensor, y_train_tensor, x_test_tensor, y_test_tensor, x_validation_tensor, y_validation_tensor
 
@@ -293,11 +293,11 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description='Train a neural network to predict the nsigma_contrast')
 
     # Add arguments
-    parser.add_argument('--epochs', type=int, default=1000, help='Number of training epochs')
+    parser.add_argument('--epochs', type=int, default=50, help='Number of training epochs')
     parser.add_argument('--learning_rate', type=float, default=0.005, help='Initial learning rate')
     parser.add_argument('--decay_rate', type=float, default=0.9, help='Decay rate of the learning rate')
     parser.add_argument('--batch_size', type=int, default=1, help='Batch size (number of observations per batch)')
-    parser.add_argument('--n_obs_train', type=int, default=1000, help='Number of observations to train on')
+    parser.add_argument('--n_obs_train', type=int, default=10, help='Number of observations to train on')
     parser.add_argument('--hidden_size', type=int, default=512, help='Hidden size')
     parser.add_argument('--n_hidden_layers', type=int, default=10, help='Number of hidden layers')
     parser.add_argument('--features_to_keep', nargs='+', default=['ESO INS4 FILT3 NAME', 'ESO INS4 OPTI22 NAME', \
@@ -322,7 +322,7 @@ if __name__ == "__main__":
     wandb.login(key="816773503882553025c709792296c759ae384f60")
 
     # Load the data located in /Dataset_creation/df_AD.csv
-    df_AD = pd.read_pickle('datasets/df_AD_timestamps.pkl')
+    df_AD = pd.read_pickle('Dataset_creation/df_AD_timestamps.pkl')
 
     # Reset the index
     df_AD = df_AD.reset_index(drop=True)
@@ -350,11 +350,13 @@ if __name__ == "__main__":
         separation_size = 124,  
     )
 
+    run_config['architecture'] += "_input_size_{}".format(len(run_config['features_to_keep']) - 2)
+    run_config['architecture'] += "_hidden_size_{}".format(run_config['hidden_size'])
+    run_config['architecture'] += "_n_hidden_layers_{}".format(run_config['n_hidden_layers'])
+
     # Get the date and time of the run to name the model
     now = datetime.datetime.now()
     run_config['model_name'] = "{}_{}_{}_{}_{}_{}_{}.pth".format(run_config['architecture'], now.year, now.month, now.day, now.hour, now.minute, now.second)
-
-    run_config['model_name'] = "nn_vector_nsigma_lr_{}_bs_{}_n_obs_train_{}_hidden_size_{}_n_hidden_layers_{}.pth".format(args.learning_rate, args.batch_size, args.n_obs_train, args.hidden_size, args.n_hidden_layers)
 
     # Define the device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

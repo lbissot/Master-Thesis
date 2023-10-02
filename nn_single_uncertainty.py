@@ -495,6 +495,10 @@ if __name__ == "__main__":
         separation_size = 124,  
     )
 
+    run_config['architecture'] += "_input_size_{}".format(len(run_config['features_to_keep']) - 1)
+    run_config['architecture'] += "_hidden_size_{}".format(run_config['hidden_size'])
+    run_config['architecture'] += "_n_hidden_layers_{}".format(run_config['n_hidden_layers'])
+
     # Get the date and time of the run to name the model
     now = datetime.datetime.now()
     run_config['model_name'] = "{}_{}_{}_{}_{}_{}_{}.pth".format(run_config['architecture'], now.year, now.month, now.day, now.hour, now.minute, now.second)
