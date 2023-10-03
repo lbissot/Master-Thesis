@@ -298,8 +298,8 @@ def train_log(training_loss, validation_loss, step):
 def custom_lr_lambda_smooth(epoch, decay_rate, lr_0):
     return (1 / (1 + decay_rate * epoch)) * lr_0
 
-def custom_lr_lambda_rough(epoch, decay_rate, lr_0):
-    return lr_0 * (decay_rate ** (epoch // 20))
+def custom_lr_lambda_rough(epoch, decay_rate, lr_0, step_size ):
+    return lr_0 * (decay_rate ** (epoch // step_size))
 
 def train(model, x, y, x_val, y_val, criterion, optimizer, config):
     # Tell wandb to watch what the model gets up to: gradients, weights, and more!
@@ -307,7 +307,7 @@ def train(model, x, y, x_val, y_val, criterion, optimizer, config):
 
     batch_ctr = 0
 
-    custom_scheduler = LambdaLR(optimizer, lr_lambda=lambda epoch: custom_lr_lambda_rough(epoch, decay_rate=config.decay_rate, lr_0=config.learning_rate))
+    custom_scheduler = LambdaLR(optimizer, lr_lambda=lambda epoch: custom_lr_lambda_rough(epoch, decay_rate=config.decay_rate, lr_0=config.learning_rate, step_size=config.step_size))
 
     # Run training and track with wandb
     for epoch in range(config.epochs):
@@ -439,12 +439,13 @@ def parse_arguments():
 
     # Add arguments
     parser.add_argument('--epochs', type=int, default=1000, help='Number of training epochs')
-    parser.add_argument('--learning_rate', type=float, default=0.006, help='Initial learning rate')
+    parser.add_argument('--learning_rate', type=float, default=0.005, help='Initial learning rate')
     parser.add_argument('--decay_rate', type=float, default=0.9, help='Decay rate of the learning rate')
     parser.add_argument('--batch_size', type=int, default=1, help='Batch size (number of observations per batch)')
     parser.add_argument('--n_obs_train', type=int, default=1000, help='Number of observations to train on')
     parser.add_argument('--hidden_size', type=int, default=512, help='Hidden size')
     parser.add_argument('--n_hidden_layers', type=int, default=20, help='Number of hidden layers')
+    parser.add_argument('--step_size', type=int, default=15, help='Step size for the learning rate scheduler')
     parser.add_argument('--features_to_keep', nargs='+', default=['ESO INS4 FILT3 NAME', 'ESO INS4 OPTI22 NAME', \
         'ESO AOS VISWFS MODE', 'ESO TEL AMBI WINDSP', 'ESO TEL AMBI RHUM', \
             'HIERARCH ESO INS4 TEMP422 VAL', 'HIERARCH ESO TEL TH M1 TEMP', 'HIERARCH ESO TEL AMBI TEMP', \
@@ -479,6 +480,7 @@ if __name__ == "__main__":
         decay_rate = args.decay_rate,
         batch_size = args.batch_size, 
         n_obs_train = args.n_obs_train,
+        step_size = args.step_size,
         loss_function = 'mse',
         optimizer = 'adam',
         architecture = 'MLP_single_uncertainty',

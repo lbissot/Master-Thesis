@@ -71,11 +71,12 @@ def model_pipeline(run_config):
 
     # Train the model
     print("Training the model ...")
-    best_model = train(models, x_train, y_train, x_validation, y_validation, config)
+    train(models, x_train, y_train, x_validation, y_validation, config)
 
-    # Save the model
-    with open(config.model_name, 'wb') as file:
-        pickle.dump(best_model, file)
+    # Load the best model
+    print("Loading the best model ...")
+    with open(config.model_name, 'rb') as file:
+        best_model = pickle.load(file)
 
     # Test the model
     print("Testing the model ...")
@@ -161,7 +162,7 @@ def make_data(df_AD, config):
     # Get the number of points to keep
     n_points = config.n_obs_train * len(separation)
 
-    return x_train[:n_points], y_train[:n_points], x_test, y_test, x_validation, y_validation
+    return x_train[:n_points], np.log10(y_train[:n_points]), x_test, np.log10(y_test), x_validation, np.log10(y_validation)
 
 
 def train(models, x_train, y_train, x_validation, y_validation, config):
@@ -177,14 +178,16 @@ def train(models, x_train, y_train, x_validation, y_validation, config):
     for model in models:
         y_pred = model.predict(x_validation)
         mse = mean_squared_error(y_validation, y_pred)
-        print("MSE: {}".format(mse))
 
         if mse <= best_mse:
             best_mse = mse
             best_model = model
             config.max_features = model.max_features
+            # Save the model
+            with open(config.model_name, 'wb') as file:
+                pickle.dump(best_model, file)
 
-    return best_model
+    print("Best MSE on the validation set : {}".format(best_mse))
 
 
 def test(model, x, y, config):
