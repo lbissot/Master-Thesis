@@ -247,7 +247,7 @@ def make(config):
 
 def shuffle(x, y, config):
 
-    x_shuffled, y_shuffled = shuffle_sequences(x, y, config.separation_size) # Shuffle observations or batches ???
+    x_shuffled, y_shuffled = shuffle_sequences(x, y, config.shuffle_seq_length)
     return x_shuffled, y_shuffled
 
 
@@ -446,6 +446,7 @@ def parse_arguments():
     parser.add_argument('--hidden_size', type=int, default=512, help='Hidden size')
     parser.add_argument('--n_hidden_layers', type=int, default=20, help='Number of hidden layers')
     parser.add_argument('--step_size', type=int, default=15, help='Step size for the learning rate scheduler')
+    parser.add_argument('--shuffle_seq_length', type=int, default=124, help='Length of the sequences to shuffle')
     parser.add_argument('--features_to_keep', nargs='+', default=['ESO INS4 FILT3 NAME', 'ESO INS4 OPTI22 NAME', \
         'ESO AOS VISWFS MODE', 'ESO TEL AMBI WINDSP', 'ESO TEL AMBI RHUM', \
             'HIERARCH ESO INS4 TEMP422 VAL', 'HIERARCH ESO TEL TH M1 TEMP', 'HIERARCH ESO TEL AMBI TEMP', \
@@ -481,6 +482,7 @@ if __name__ == "__main__":
         batch_size = args.batch_size, 
         n_obs_train = args.n_obs_train,
         step_size = args.step_size,
+        shuffle_seq_length = args.shuffle_seq_length,
         loss_function = 'mse',
         optimizer = 'adam',
         architecture = 'MLP_single_uncertainty',
@@ -507,6 +509,10 @@ if __name__ == "__main__":
 
     # Change the batch size to be the number of points per batch instead of the number of observations per batch
     run_config['batch_size'] = run_config['batch_size'] * run_config['separation_size']
+
+    # Check if separation_size is a multiple of shuffle_seq_length
+    if run_config['separation_size'] % run_config['shuffle_seq_length'] != 0:
+        raise ValueError("separation_size must be a multiple of shuffle_seq_length")
 
     # Define the device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
