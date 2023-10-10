@@ -8,8 +8,6 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR
 from sklearn.impute import KNNImputer
 from sklearn.preprocessing import StandardScaler
-import argparse
-import copy
 import datetime
 
 # Define the model
@@ -77,12 +75,23 @@ def reshape_dataframe(df, vec_column_name_list):
     return df_reshaped
 
 
-def model_pipeline(hyperparameters):
+def model_pipeline():
 
     # tell wandb to get started
-    with wandb.init(project="master-thesis", config=run_config):
+    with wandb.init(project="master-thesis"):
         # access all HPs through wandb.config, so logging matches execution!
         config = wandb.config
+
+        # Define the device
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        print("Device : {}".format(device))
+        config.device = device
+
+        # Specify the name of the model in order to be able to load it later
+        config.architecture = "MLP_single_nsigma_input_size_{}".format(len(config.features_to_keep) - 1) + "_hidden_size_{}".format(config.hidden_size) + "_n_hidden_layers_{}".format(config.n_hidden_layers)
+        # Get the date and time of the run to name the model
+        now = datetime.datetime.now()
+        config.model_name = "{}_{}_{}_{}_{}_{}_{}.pth".format(config.architecture, now.year, now.month, now.day, now.hour, now.minute, now.second)
 
         # make the data
         print("Making the data...")
@@ -95,27 +104,12 @@ def model_pipeline(hyperparameters):
 
         # make the model, data, and optimization problem
         model, criterion, optimizer = make(config)
-        # print(model)
 
         # and use them to train the model
         print("Training the model...")
-        train(model, x_train_tensor, y_train_log_tensor, x_valid_tensor, y_valid_tensor, criterion, optimizer, config)
+        val_loss = train(model, x_train_tensor, y_train_log_tensor, x_valid_tensor, y_valid_tensor, criterion, optimizer, config)
+        wandb.log({"minimum validation loss": val_loss})
         print("Done training!")
-
-        # load the best model according to the validation set
-        best_model = MLP(
-            input_features=len(config.features_to_keep) - 1, # Don't forget to remove the target feature
-            output_features=1,
-            hidden_features=config.hidden_size,
-            num_hidden_layers=config.n_hidden_layers
-            ).to(device)
-        best_model.load_state_dict(torch.load(config.model_name))
-
-        # and test its final performance
-        print("Testing the model...")
-        test(best_model, x_test_tensor, y_test_log_tensor, config)
-
-    return best_model, x_train_tensor, y_train_log_tensor, x_test_tensor, y_test_log_tensor, x_valid_tensor, y_valid_tensor
 
 
 def make_data(df_AD, config):
@@ -145,7 +139,11 @@ def make_data(df_AD, config):
     df_AD.loc[:, 'SEPARATION'] = df_AD['SEPARATION'].apply(lambda x: np.array(x) / np.max(x))
 
     # Split the data into train, validation and test sets
-    train = df_AD.sample(frac=0.8, random_state=config.random_state)
+    num_obs = len(df_AD)
+    num_train = int(0.8 * num_obs)
+    num_train = num_train - (num_train % config.batch_size)
+
+    train = df_AD.sample(n=num_train, random_state=config.random_state)
     validation = df_AD.drop(train.index)
     test = validation.sample(frac=0.5, random_state=config.random_state)
     validation = validation.drop(test.index)
@@ -200,6 +198,7 @@ def make_data(df_AD, config):
 
 
 def make(config):
+    device = config.device
 
     # Make the model
     model = MLP(
@@ -273,6 +272,8 @@ def custom_lr_lambda_rough(epoch, decay_rate, lr_0, step_size):
     return lr_0 * (decay_rate ** (epoch // step_size))
 
 def train(model, x, y, x_val, y_val, criterion, optimizer, config):
+    device = config.device
+
     # Tell wandb to watch what the model gets up to: gradients, weights, and more!
     wandb.watch(model, criterion, log="all", log_freq=10)
 
@@ -296,7 +297,7 @@ def train(model, x, y, x_val, y_val, criterion, optimizer, config):
             y_batch = y_shuffled[batch_start:batch_end]
 
             # Train the model
-            batch_losses.append(train_batch(x_batch, y_batch, model, optimizer, criterion).item())
+            batch_losses.append(train_batch(x_batch, y_batch, model, optimizer, criterion, config).item())
 
             # Increment the batch counter
             batch_ctr += 1
@@ -330,8 +331,12 @@ def train(model, x, y, x_val, y_val, criterion, optimizer, config):
                 print("Early stopping")
                 break
 
+    return min_val_loss
 
-def train_batch(x, y, model, optimizer, criterion):
+
+def train_batch(x, y, model, optimizer, criterion, config):
+    device = config.device
+
     x, y = x.to(device), y.to(device)
     
     # Forward pass
@@ -381,54 +386,7 @@ def test(model, x, y, config):
         wandb.log({"testing_mean_MSE": mean_mse, "testing_median_MSE": median_mse, "testing_mean_MAE": mean_mae, "testing_median_MAE": median_mae})
 
 
-def plot_predictions(model, X, y, idx):
-    separation = df_AD['SEPARATION'].iloc[idx]
-    
-    
-    start = idx * len(separation)
-    stop = start + len(separation)
-
-    prediction = model(X).detach().numpy()
-    prediction = prediction[start:stop]
-    contrast = y[start:stop].detach().numpy()
-    separation = X[start:stop, 1].detach().numpy()
-
-    plt.plot(separation, contrast, color='blue', label='Actual')
-    plt.plot(separation, prediction, color='red', label='Predicted')
-    plt.xlabel('Separation (arcsec)')
-    plt.ylabel('Contrast (5-sigma)')
-    plt.legend()
-    plt.show()
-
-    
-# Define the argparse setup
-def parse_arguments():
-    parser = argparse.ArgumentParser(description='Train a neural network to predict the nsigma_contrast')
-
-    # Add arguments
-    parser.add_argument('--epochs', type=int, default=1000, help='Number of training epochs')
-    parser.add_argument('--learning_rate', type=float, default=0.005, help='Initial learning rate')
-    parser.add_argument('--decay_rate', type=float, default=0.9, help='Decay rate of the learning rate')
-    parser.add_argument('--batch_size', type=int, default=1, help='Batch size (number of observations per batch)')
-    parser.add_argument('--n_obs_train', type=int, default=1000, help='Number of observations to train on')
-    parser.add_argument('--hidden_size', type=int, default=512, help='Hidden size')
-    parser.add_argument('--n_hidden_layers', type=int, default=7, help='Number of hidden layers')
-    parser.add_argument('--step_size', type=int, default=10, help='Step size for the learning rate scheduler')
-    parser.add_argument('--shuffle_seq_length', type=int, default=124, help='Length of the sequences to shuffle')
-    parser.add_argument('--features_to_keep', nargs='+', default=['ESO INS4 FILT3 NAME', 'ESO INS4 OPTI22 NAME', \
-        'ESO AOS VISWFS MODE', 'ESO TEL AMBI WINDSP', 'ESO TEL AMBI RHUM', \
-            'HIERARCH ESO INS4 TEMP422 VAL', 'HIERARCH ESO TEL TH M1 TEMP', 'HIERARCH ESO TEL AMBI TEMP', \
-                'ESO DET NDIT', 'ESO DET SEQ1 DIT', 'SIMBAD_FLUX_G', 'SIMBAD_FLUX_H', 'SEEING_MEDIAN', \
-                    'SEEING_STD', 'COHERENCE_TIME_MEDIAN', 'COHERENCE_TIME_STD', 'SCFOVROT', 'SEPARATION', 'NSIGMA_CONTRAST'], 
-                    help='List of features to keep')
-    
-    return parser.parse_args()
-
-
 if __name__ == "__main__":
-
-    # Parse command-line arguments
-    args = parse_arguments()
 
     # print the python version
     print("Python version: {}".format(sys.version))
@@ -442,55 +400,81 @@ if __name__ == "__main__":
     # Reset the index
     df_AD = df_AD.reset_index(drop=True)
 
-    run_config = dict(
-        # Model
-        epochs = args.epochs,
-        learning_rate = args.learning_rate,
-        decay_rate = args.decay_rate,
-        batch_size = args.batch_size, 
-        n_obs_train = args.n_obs_train,
-        step_size = args.step_size,
-        shuffle_seq_length = args.shuffle_seq_length,
-        loss_function = 'mse',
-        optimizer = 'adam',
-        architecture = 'MLP_single_nsigma',
-        hidden_size = args.hidden_size,
-        n_hidden_layers = args.n_hidden_layers,
-        scale = 'log',
-        stop_after_epochs_without_improvement = 20,
-        model_name = "",
-        
-        # Data
-        random_state = 42,
-        features_to_keep = args.features_to_keep,
-        categorical_features = ['ESO INS4 FILT3 NAME', 'ESO INS4 OPTI22 NAME', 'ESO AOS VISWFS MODE'],
-        separation_size = 124,  
-    )
+    sweep_config = {
+        'method': 'random',
+        'metric': {
+            'name': 'minimum validation loss',
+            'goal': 'minimize'
+        },
+    }
 
-    run_config['architecture'] += "_input_size_{}".format(len(run_config['features_to_keep']) - 1)
-    run_config['architecture'] += "_hidden_size_{}".format(run_config['hidden_size'])
-    run_config['architecture'] += "_n_hidden_layers_{}".format(run_config['n_hidden_layers'])
+    parameters_dict = {
+        'epochs': {
+            'value' : 1000,
+        },
+        'learning_rate': {
+            'distribution' : 'uniform',
+            'min': 0.001,
+            'max': 0.01
+        },
+        'decay_rate': {
+            'values': [0.9, 0.7, 0.5]
+        },
+        'batch_size': {
+            # Multiply the batch size ([1, 2, 4, 8] observations) by the separation size to get the number of points per batch 
+            'values': [124, 248, 496, 992]
+        },
+        'n_obs_train': {
+            'value' : 1000,
+        },
+        'hidden_size': {
+            'values': [128, 256, 512]
+        },
+        'n_hidden_layers': {
+            'distribution' : 'int_uniform',
+            'min': 5,
+            'max': 25
+        },
+        'step_size': {
+            'distribution' : 'int_uniform',
+            'min': 5,
+            'max': 20
+        },
+        'shuffle_seq_length': {
+            'values': [1, 4, 124]
+        },
+        'loss_function': {
+            'value': 'mse'
+        },
+        'optimizer': {
+            'value': 'adam'
+        },
+        'scale': {
+            'value': 'log'
+        },
+        'stop_after_epochs_without_improvement': {
+            'value': 25
+        },
+        'random_state': {
+            'value': 42
+        },
+        'features_to_keep': {
+            'value': ['ESO INS4 FILT3 NAME', 'ESO INS4 OPTI22 NAME', \
+                'ESO AOS VISWFS MODE', 'ESO TEL AMBI WINDSP', 'ESO TEL AMBI RHUM', \
+                    'HIERARCH ESO INS4 TEMP422 VAL', 'HIERARCH ESO TEL TH M1 TEMP', 'HIERARCH ESO TEL AMBI TEMP', \
+                        'ESO DET NDIT', 'ESO DET SEQ1 DIT', 'SIMBAD_FLUX_G', 'SIMBAD_FLUX_H', 'SEEING_MEDIAN', \
+                            'SEEING_STD', 'COHERENCE_TIME_MEDIAN', 'COHERENCE_TIME_STD', 'SCFOVROT', 'SEPARATION', 'NSIGMA_CONTRAST']
+        },
+        'categorical_features': {
+            'value': ['ESO INS4 FILT3 NAME', 'ESO INS4 OPTI22 NAME', 'ESO AOS VISWFS MODE']
+        },
+        'separation_size': {
+            'value': 124
+        },
+    }
 
-    # Get the date and time of the run to name the model
-    now = datetime.datetime.now()
-    run_config['model_name'] = "{}_{}_{}_{}_{}_{}_{}.pth".format(run_config['architecture'], now.year, now.month, now.day, now.hour, now.minute, now.second)
+    sweep_config['parameters'] = parameters_dict
 
-    # Change the batch size to be the number of points per batch instead of the number of observations per batch
-    run_config['batch_size'] = run_config['batch_size'] * run_config['separation_size']
+    sweep_id = wandb.sweep(sweep_config, project="master-thesis")
 
-    # Check if separation_size is a multiple of shuffle_seq_length
-    if run_config['separation_size'] % run_config['shuffle_seq_length'] != 0:
-        raise ValueError("separation_size must be a multiple of shuffle_seq_length")
-
-    # Define the device
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print("Device : {}".format(device))
-
-    # Build, train and analyze the model with the pipeline
-    model, \
-        x_train_tensor, y_train_log_tensor, \
-            x_test_tensor, y_test_log_tensor, \
-                x_valid_tensor, y_valid_tensor = model_pipeline(run_config)
-
-    # Save the model
-    torch.save(model.state_dict(), run_config['model_name'])
+    wandb.agent(sweep_id, function=model_pipeline, count=25)
