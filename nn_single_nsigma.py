@@ -141,7 +141,7 @@ def make_data(df_AD, config):
     # Split the data into train, validation and test sets
     num_obs = len(df_AD)
     num_train = int(0.8 * num_obs)
-    num_train = num_train - (num_train % config.batch_size)
+    num_train = num_train - (num_train % 8)
 
     train = df_AD.sample(n=num_train, random_state=config.random_state)
     validation = df_AD.drop(train.index)
@@ -410,35 +410,37 @@ if __name__ == "__main__":
 
     parameters_dict = {
         'epochs': {
-            'value' : 1000,
+            'value' : 600,
         },
         'learning_rate': {
             'distribution' : 'uniform',
-            'min': 0.001,
-            'max': 0.01
+            'min': 0.005,
+            'max': 0.015
         },
         'decay_rate': {
-            'values': [0.9, 0.7, 0.5]
+            'distribution' : 'uniform',
+            'min': 0.75,
+            'max': 0.99
         },
         'batch_size': {
             # Multiply the batch size ([1, 2, 4, 8] observations) by the separation size to get the number of points per batch 
-            'values': [124, 248, 496, 992]
+            'values': [124, 248]
         },
         'n_obs_train': {
             'value' : 1000,
         },
         'hidden_size': {
-            'values': [128, 256, 512]
+            'values': [256, 512]
         },
         'n_hidden_layers': {
             'distribution' : 'int_uniform',
-            'min': 5,
-            'max': 25
+            'min': 10,
+            'max': 30
         },
         'step_size': {
             'distribution' : 'int_uniform',
-            'min': 5,
-            'max': 20
+            'min': 10,
+            'max': 25
         },
         'shuffle_seq_length': {
             'values': [1, 4, 124]
@@ -477,4 +479,4 @@ if __name__ == "__main__":
 
     sweep_id = wandb.sweep(sweep_config, project="master-thesis")
 
-    wandb.agent(sweep_id, function=model_pipeline, count=25)
+    wandb.agent(sweep_id, function=model_pipeline, count=30)

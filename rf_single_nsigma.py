@@ -9,7 +9,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import StandardScaler
 from sklearn.impute import KNNImputer
-
+import time
 
 def reshape_dataframe(df, vec_column_name_list):
     """
@@ -70,8 +70,12 @@ def model_pipeline(run_config):
     x_train, y_train, x_test, y_test, x_validation, y_validation = make_data(df_AD, config)
 
     # Train the model
-    print("Training the model ...")
-    train(models, x_train, y_train, x_validation, y_validation, config)
+    print("Training the models ...")
+    # time the training
+    start = time.time()
+    val_loss = train(models, x_train, y_train, x_validation, y_validation, config)
+    end = time.time()
+    print("Training time: {}".format(end - start))
 
     # Load the best model
     print("Loading the best model ...")
@@ -79,15 +83,15 @@ def model_pipeline(run_config):
         best_model = pickle.load(file)
 
     # Test the model
-    print("Testing the model ...")
-    mean_mse, mean_mae, median_mse, median_mae = test(best_model, x_test, y_test, config)
-    print("Mean MSE: {}".format(mean_mse))
-    print("Mean MAE: {}".format(mean_mae))
-    print("Median MSE: {}".format(median_mse))
-    print("Median MAE: {}".format(median_mae))
+    # print("Testing the model ...")
+    # mean_mse, mean_mae, median_mse, median_mae = test(best_model, x_test, y_test, config)
+    # print("Mean MSE: {}".format(mean_mse))
+    # print("Mean MAE: {}".format(mean_mae))
+    # print("Median MSE: {}".format(median_mse))
+    # print("Median MAE: {}".format(median_mae))
 
-    # Plot the predictions
-    plot_predictions(best_model, x_test, y_test, 0)
+    # # Plot the predictions
+    # plot_predictions(best_model, x_test, y_test, 0)
 
     return best_model, x_train, y_train, x_test, y_test, x_validation, y_validation
 
@@ -119,7 +123,11 @@ def make_data(df_AD, config):
     df_AD.loc[:, 'SEPARATION'] = df_AD['SEPARATION'].apply(lambda x: np.array(x) / np.max(x))
 
     # Split the data into train, validation and test sets
-    train = df_AD.sample(frac=0.8, random_state=config.random_state)
+    num_obs = len(df_AD)
+    num_train = int(0.8 * num_obs)
+    num_train = num_train - (num_train % 8)
+
+    train = df_AD.sample(n=num_train, random_state=config.random_state)
     validation = df_AD.drop(train.index)
     test = validation.sample(frac=0.5, random_state=config.random_state)
     validation = validation.drop(test.index)
@@ -169,8 +177,11 @@ def train(models, x_train, y_train, x_validation, y_validation, config):
 
     # Train the models
     for model in models:
+        print("Training the model with max_features = {} ...".format(model.max_features))
         model.fit(x_train, y_train)
+        print("Done")
     
+    print("Selecting the best model ...")
     # Evaluate the models and keep the best one
     best_model = None
     best_mse = np.inf
@@ -178,6 +189,7 @@ def train(models, x_train, y_train, x_validation, y_validation, config):
     for model in models:
         y_pred = model.predict(x_validation)
         mse = mean_squared_error(y_validation, y_pred)
+        print("MSE on the validation set with max_features = {} : {}".format(model.max_features, mse))
 
         if mse <= best_mse:
             best_mse = mse
@@ -188,6 +200,7 @@ def train(models, x_train, y_train, x_validation, y_validation, config):
                 pickle.dump(best_model, file)
 
     print("Best MSE on the validation set : {}".format(best_mse))
+    return best_mse
 
 
 def test(model, x, y, config):
@@ -247,41 +260,22 @@ def make(config):
     return models
 
 
-# Define the argparse setup
-def parse_arguments():
-    parser = argparse.ArgumentParser(description='Train a neural network to predict the nsigma_contrast')
-
-    # Add arguments
-    parser.add_argument('--n_obs_train', type=int, default=1000, help='Number of observations to train on')
-    parser.add_argument('--features_to_keep', nargs='+', default=['ESO INS4 FILT3 NAME', 'ESO INS4 OPTI22 NAME', \
-        'ESO AOS VISWFS MODE', 'ESO TEL AMBI WINDSP', 'ESO TEL AMBI RHUM', \
-            'HIERARCH ESO INS4 TEMP422 VAL', 'HIERARCH ESO TEL TH M1 TEMP', 'HIERARCH ESO TEL AMBI TEMP', \
-                'ESO DET NDIT', 'ESO DET SEQ1 DIT', 'SIMBAD_FLUX_G', 'SIMBAD_FLUX_H', 'SEEING_MEDIAN', \
-                    'SEEING_STD', 'COHERENCE_TIME_MEDIAN', 'COHERENCE_TIME_STD', 'SCFOVROT', 'SEPARATION', 'NSIGMA_CONTRAST'], 
-                    help='List of features to keep')
-    
-    return parser.parse_args()
-
-
 if __name__ == "__main__":
-
-    # Parse command-line arguments
-    args = parse_arguments()
 
     # print the python version
     print("Python version: {}".format(sys.version))
 
     # Load the data located in /Dataset_creation/df_AD.csv
-    df_AD = pd.read_pickle('datasets/df_AD_timestamps.pkl')
+    df_AD = pd.read_pickle('Dataset_creation/df_AD_timestamps.pkl')
 
     # Reset the index
     df_AD = df_AD.reset_index(drop=True)
 
     run_config = dict(
         # Model
-        n_obs_train = args.n_obs_train,
-        n_estimators = 1000,
-        max_features = [0.1, 0.3, 0.5, 0.7, 0.9, 1],
+        n_obs_train = 1000,
+        n_estimators = 500,
+        max_features = [0.1, 0.3, 0.5, 0.7, 0.9, 1.0],
         loss_function = 'mse',
         architecture = 'RF_single_nsigma',
         scale = 'log',
@@ -289,7 +283,11 @@ if __name__ == "__main__":
         
         # Data
         random_state = 42,
-        features_to_keep = args.features_to_keep,
+        features_to_keep = ['ESO INS4 FILT3 NAME', 'ESO INS4 OPTI22 NAME', \
+            'ESO AOS VISWFS MODE', 'ESO TEL AMBI WINDSP', 'ESO TEL AMBI RHUM', \
+                'HIERARCH ESO INS4 TEMP422 VAL', 'HIERARCH ESO TEL TH M1 TEMP', 'HIERARCH ESO TEL AMBI TEMP', \
+                    'ESO DET NDIT', 'ESO DET SEQ1 DIT', 'SIMBAD_FLUX_G', 'SIMBAD_FLUX_H', 'SEEING_MEDIAN', \
+                        'SEEING_STD', 'COHERENCE_TIME_MEDIAN', 'COHERENCE_TIME_STD', 'SCFOVROT', 'SEPARATION', 'NSIGMA_CONTRAST'],
         categorical_features = ['ESO INS4 FILT3 NAME', 'ESO INS4 OPTI22 NAME', 'ESO AOS VISWFS MODE'],
         separation_size = 124,  
     )
