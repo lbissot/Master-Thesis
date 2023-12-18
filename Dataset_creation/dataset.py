@@ -357,42 +357,44 @@ class Dataset:
                 # 1. Match the folder name with the folder name in the timestamps and sparta folders
 
                 # Indicator of whether we find a matching folder name in the timestamps or not
-                # (based on target name and date).
+                # (based on target name and date and UTC).
                 timestamp_miss = True
 
                 for j, timestamps_folder in enumerate(self.__folder_names_timestamps):
-                        if folder_name_split[0] == folder_names_timestamps_split[j][0] and \
-                            folder_name_split[3] == folder_names_timestamps_split[j][3]:
+                    # If the target name and the date match
+                    if folder_name_split[0] == folder_names_timestamps_split[j][0] and \
+                        folder_name_split[3] == folder_names_timestamps_split[j][3]:
 
-                            try:
-                                with fits.open(os.path.join(self.__path_timestamps, timestamps_folder, self.__filename_timestamps)) as hdul_timestamps:
-                                    # Check whether the headers UTC or LST match
-                                    try:
-                                        timestamp_UTC = hdul_timestamps[0].header['UTC']
-                                        timestamp_LST = hdul_timestamps[0].header['LST']
-                                        contrast_UTC = fits_headers['UTC']
-                                        contrast_LST = fits_headers['LST']
-                                    except:
-                                        print("UTC or LST missing in the timestamps header {}".format(timestamps_folder))
+                        try:
+                            with fits.open(os.path.join(self.__path_timestamps, timestamps_folder, self.__filename_timestamps)) as hdul_timestamps:
+                                # Check whether the headers UTC or LST match
+                                try:
+                                    timestamp_UTC = hdul_timestamps[0].header['UTC']
+                                    timestamp_LST = hdul_timestamps[0].header['LST']
+                                    contrast_UTC = fits_headers['UTC']
+                                    contrast_LST = fits_headers['LST']
+                                except:
+                                    print("UTC or LST missing in the timestamps header {}".format(timestamps_folder))
 
-                                    if timestamp_UTC == contrast_UTC or timestamp_LST == contrast_LST:
-                                        # The offset is actually the modified julian day of the observation
-                                        offset = hdul_timestamps[0].header['SUBTRACT']
-                                        data_dict['OBS_STA_TIMESTAMPS'] = hdul_timestamps[0].data[0] + offset
-                                        data_dict['OBS_END_TIMESTAMPS'] = hdul_timestamps[0].data[-1] + offset
+                                if timestamp_UTC == contrast_UTC or timestamp_LST == contrast_LST:
+                                    # The offset is actually the modified julian day of the observation
+                                    offset = hdul_timestamps[0].header['SUBTRACT']
+                                    data_dict['OBS_STA_TIMESTAMPS'] = hdul_timestamps[0].data[0] + offset
+                                    data_dict['OBS_END_TIMESTAMPS'] = hdul_timestamps[0].data[-1] + offset
 
-                                        # Convert the MJD to a datetime object in isot format.
-                                        data_dict['OBS_STA_TIMESTAMPS'] = Time(data_dict['OBS_STA_TIMESTAMPS'], format='mjd').isot
-                                        data_dict['OBS_END_TIMESTAMPS'] = Time(data_dict['OBS_END_TIMESTAMPS'], format='mjd').isot
+                                    # Convert the MJD to a datetime object in isot format.
+                                    data_dict['OBS_STA_TIMESTAMPS'] = Time(data_dict['OBS_STA_TIMESTAMPS'], format='mjd').isot
+                                    data_dict['OBS_END_TIMESTAMPS'] = Time(data_dict['OBS_END_TIMESTAMPS'], format='mjd').isot
 
-                                        # Will be used to investiguate weird values.
-                                        data_dict['TIMESTAMPS_DIR'] = timestamps_folder
+                                    # Will be used to investiguate weird values.
+                                    data_dict['TIMESTAMPS_DIR'] = timestamps_folder
 
-                                        timestamp_miss = False
-                            except:
-                                timestamp_miss = True
+                                    timestamp_miss = False
+                        except:
+                            timestamp_miss = True
 
                 if timestamp_miss:
+                    # Indicate that the timestamps were not recovered.
                     data_dict['OBS_STA_TIMESTAMPS'] = None
                     data_dict['OBS_END_TIMESTAMPS'] = None
                     self.__missings['OBS_STA_TIMESTAMPS'].append(folder)
@@ -450,7 +452,6 @@ class Dataset:
 
                     # If the observation is before 2 april 2016, we use the old query.
                     # Else, we use the new query.
-                    # with HiddenPrints():
                     if start < Time('2016-04-02T00:00:00.000', format='isot'):
                         with HiddenPrints():
                             asm_data = qea.query_old_dimm(os.path.join(self.__path_contrast, folder), str(start), str(stop))
