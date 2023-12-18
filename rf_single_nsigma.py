@@ -83,12 +83,12 @@ def model_pipeline(run_config):
         best_model = pickle.load(file)
 
     # Test the model
-    # print("Testing the model ...")
-    # mean_mse, mean_mae, median_mse, median_mae = test(best_model, x_test, y_test, config)
-    # print("Mean MSE: {}".format(mean_mse))
-    # print("Mean MAE: {}".format(mean_mae))
-    # print("Median MSE: {}".format(median_mse))
-    # print("Median MAE: {}".format(median_mae))
+    print("Testing the model ...")
+    mean_mse, mean_mae, median_mse, median_mae = test(best_model, x_test, y_test, config)
+    print("Mean MSE: {}".format(mean_mse))
+    print("Mean MAE: {}".format(mean_mae))
+    print("Median MSE: {}".format(median_mse))
+    print("Median MAE: {}".format(median_mae))
 
     # # Plot the predictions
     # plot_predictions(best_model, x_test, y_test, 0)
@@ -275,7 +275,7 @@ if __name__ == "__main__":
         # Model
         n_obs_train = 1000,
         n_estimators = 500,
-        max_features = [0.1, 0.3, 0.5, 0.7, 0.9, 1.0],
+        max_features = [1.0],
         loss_function = 'mse',
         architecture = 'RF_single_nsigma',
         scale = 'log',

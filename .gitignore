@@ -15,3 +15,7 @@ timestamps_missings.txt
 wandb/
 *.html
 *.pth
+*.sbatch
+.vscode/
+Meeting_notes/
+TO_PLOT/
