@@ -10,7 +10,7 @@ The primary objective of this folder is to facilitate the construction of a comp
 
 Contained within this sub-directory are shell scripts responsible for retrieving data from the SPHERE client. Executing these scripts automates the process of fetching the necessary data for subsequent processing.
 
-### `SPHERE_DC_DATA``
+### `SPHERE_DC_DATA`
 
 Contains the subfolders `contrast_curves` and `timestamps` which are the folders where the (raw) data from the SPHERE client is downloaded.
 
