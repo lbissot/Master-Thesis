@@ -18,6 +18,9 @@
             </ul>
         </li>
         <li>
+            <a href='#Models'>Models</a>
+        </li>
+        <li>
             <a href='#Contact'>Contact</a>
         </li>
     </ol>
@@ -47,10 +50,33 @@ If you are using windows you should install [wget](https://gnuwin32.sourceforge.
 ### SPHERE data
 
 1. **Download SPHERE Data:**
-    - You can either retrieve the SPHERE data download script from the [SPHERE client](https://sphere.osug.fr/spip.php?rubrique34&lang=fr) or simply use the one located in `Dataset_creation/Download Scripts`. 
-    Note that if you download the script yourself you need to parse it using `Dataset_creation/sphere_dl_parser.py` in order to skip unwanted (and voluminous) files.
+    - You can either retrieve the SPHERE data download script from the [SPHERE client](https://sphere.osug.fr/spip.php?rubrique34&lang=fr) or simply use the one located in `Dataset_creation/Download Scripts`.  
 
-    Then you just have to launch a terminal in the script folder and execute it.
+    In order to retrieve the data from the [SPHERE client](https://sphere.osug.fr/spip.php?rubrique34&lang=fr) you need to follow these steps :
+
+    i. **Browse Process**
+
+    ii. **Use the following options :**
+    ```plaintext
+    Process/recipe/ird_specal_dc
+    ```
+
+    ```plaintext
+    Process/Preset/cADI_softsorting / ird_specal_dc / production
+    ```
+
+    ```plaintext
+    Observation / Parameters/Filter/DB_H23
+    ```
+
+    iii. **Generate the download script :**  
+    Select all the processes, then right click and select `Download script/Selected - outputs only` 
+
+    iv. **Parse the file :**
+    In the `Dataset_creation` folder there is a file named `sphere_dl_parser.py` that can be used in order to remove the unwanted files in the download script.
+
+
+    - Then you just have to launch a terminal in the script folder and execute it.
 
    * Linux
     ```sh
