@@ -75,8 +75,8 @@ If you are using windows you should install [wget](https://gnuwin32.sourceforge.
     iv. **Parse the file :**
     In the `Dataset_creation` folder there is a file named `sphere_dl_parser.py` that can be used in order to remove the unwanted files in the download script.
 
-
-    - Then you just have to launch a terminal in the script folder and execute it.
+    v. **Execute the script :**
+    You just have to launch a terminal in the script folder and execute it.
 
    * Linux
     ```sh
