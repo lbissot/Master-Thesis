@@ -36,7 +36,7 @@ Taking direct pictures of extrasolar planetary systems is an important, yet chal
 
 
 <!-- GETTING STARTED -->
-## Database creation
+## Dataset creation
 
 To get a local copy up and running follow these simple steps.
 
@@ -46,58 +46,65 @@ If you are using windows you should install [wget](https://gnuwin32.sourceforge.
 
 ### SPHERE data
 
-You can either retrieve the SPHERE data download script from the [SPHERE client](https://sphere.osug.fr/spip.php?rubrique34&lang=fr) or simply use the one located in `Dataset_creation/Download Scripts`. 
-Note that if you download the script yourself you need to parse it using `Dataset_creation/sphere_dl_parser.py` in order to skip unwanted (and voluminous) files.
+1. **Download SPHERE Data:**
+    - You can either retrieve the SPHERE data download script from the [SPHERE client](https://sphere.osug.fr/spip.php?rubrique34&lang=fr) or simply use the one located in `Dataset_creation/Download Scripts`. 
+    Note that if you download the script yourself you need to parse it using `Dataset_creation/sphere_dl_parser.py` in order to skip unwanted (and voluminous) files.
 
-Then you just have to launch a terminal in the script folder and execute it.
+    Then you just have to launch a terminal in the script folder and execute it.
 
-* Linux
-  ```sh
-  ./parsed_sphere_dl_script_contrast_curves.sh
-  ```
+   * Linux
+    ```sh
+    ./parsed_sphere_dl_script_contrast_curves.sh
+    ```
 
-* Windows
-  ```sh
-  sh parsed_sphere_dl_script_contrast_curves.sh
-  ```
+    * Windows
+    ```sh
+    sh parsed_sphere_dl_script_contrast_curves.sh
+    ```
 
-The observations will then be downloaded in the folder `SPHERE DC DATA` (located in the same directory as `parsed_sphere_dl_script_contrast_curves.sh`).
+2. **Create Data Folders:**
+   - After downloading the data, create the following folder structure:
 
-<!-- ### Installation
+     ```plaintext
+     SPHERE_DC_DATA
+     ├── contrast_curves
+     └── timestamps
+     ```
 
-1. Get a free API Key at [https://example.com](https://example.com)
-2. Clone the repo
-   ```sh
-   git clone https://github.com/github_username/repo_name.git
-   ```
-3. Install NPM packages
-   ```sh
-   npm install
-   ```
-4. Enter your API in `config.js`
-   ```js
-   const API_KEY = 'ENTER YOUR API';
-   ``` -->
+     These folders are where the (raw) data from the SPHERE client should be placed.
+
+3. **Move Data to Dataset Creation Folder:**
+   - The observations will be downloaded in the folder `SPHERE_DC_DATA` (located in the same directory as `parsed_sphere_dl_script_contrast_curves.sh`).
+   - Move the `SPHERE_DC_DATA` folder inside the `Dataset_creation` folder.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+## Models
+
+In order to be able to track the training of the models as well as to hypertune them [Weights and Biases](https://wandb.ai) was used. Thus in order to be able to run the codes, you need to provide your login key in the `main` of the different files.
+
+* `rf_single_nsigma.py` : Random forest that predicts a contrast value at a given separation.
+
+* `nn_single_nsigma.py` : Neural Network that predicts a contrast value at a given separation.
+
+* `nn_vector_nsigma.py` : Neural Network that predicts the whole contrast vector at once.
+
+* `nn_single_uncertainty.py` : Neural Network that computes the aleatoric uncertainty. 
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 <!-- CONTACT -->
 ## Contact
 
-Ludo Bissot - ludo.bissot@student.uliege.be
+Ludo Bissot - ludo.bissot@uclouvain.be
 
 Project Link: [https://github.com/lbissot/Master-Thesis](https://github.com/lbissot/Master-Thesis)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-
-
 <!-- ACKNOWLEDGMENTS -->
 ## Acknowledgments
 
 * [Julien Milli's github](https://github.com/jmilou/sparta) has been used to query Simbad.
-* []()
-* []()
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>

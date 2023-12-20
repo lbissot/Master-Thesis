@@ -100,7 +100,7 @@ def make_data(df_AD, config):
     test = validation.sample(frac=0.5, random_state=config.random_state)
     validation = validation.drop(test.index)
 
-    # Transform the NaN values into the median of the column of the training set (only for the numerical features)
+    # Impute the missing values using knn
     imp = KNNImputer(n_neighbors=5, weights="uniform")
     train[numerical_features] = imp.fit_transform(train[numerical_features])
     test[numerical_features] = imp.transform(test[numerical_features])
@@ -303,7 +303,8 @@ if __name__ == "__main__":
     print("Python version: {}".format(sys.version))
 
     print("Loading data...")
-    wandb.login(key="816773503882553025c709792296c759ae384f60")
+    # Login to wandb, you need to add your key
+    wandb.login(key="")
 
     # Load the data located in /Dataset_creation/df_AD.csv
     df_AD = pd.read_pickle('datasets/df_AD_timestamps.pkl')
