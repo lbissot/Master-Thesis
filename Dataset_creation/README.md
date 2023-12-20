@@ -4,15 +4,21 @@
 
 The primary objective of this folder is to facilitate the construction of a comprehensive dataset, intended for training a deep learning model. All the components found in this repository collectively contribute to this crucial step in the machine learning pipeline.
 
-## Sub-Folder(s)
+## Getting Started
 
-### `Download Scripts`
+1. **Download SPHERE Data:**
+   - Execute the scripts in the `Download Scripts` folder to retrieve data from the SPHERE client.
 
-Contained within this sub-directory are shell scripts responsible for retrieving data from the SPHERE client. Executing these scripts automates the process of fetching the necessary data for subsequent processing.
+2. **Create Data Folders:**
+   - After downloading the data, create the following folder structure:
 
-### `SPHERE_DC_DATA`
+     ```plaintext
+     SPHERE_DC_DATA
+     ├── contrast_curves
+     └── timestamps
+     ```
 
-Contains the subfolders `contrast_curves` and `timestamps` which are the folders where the (raw) data from the SPHERE client is downloaded.
+     These folders are where the (raw) data from the SPHERE client should be placed.
 
 ## Files
 
