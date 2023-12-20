@@ -227,7 +227,7 @@ class Dataset:
         # We will use the timestamps to recover the OBS_STA and OBS_END missing entries.
         self.__path_timestamps = os.path.join(path, 'timestamps')
         # Won't be used for now.
-        self.__path_sparta = os.path.join(path, 'sparta_sampleddata')
+        # self.__path_sparta = os.path.join(path, 'sparta_sampleddata')
 
         # List of fits headers to be used in the dataset.
         # 'ESO TEL AMBI FWHM MEAN', 'ESO TEL TAU0 MEAN' are not used because they are not available for all the observations.
@@ -241,21 +241,21 @@ class Dataset:
 
         self.__folder_names_contrast = get_folder_names(self.__path_contrast)
         self.__folder_names_timestamps = get_folder_names(self.__path_timestamps)
-        self.__folder_names_sparta = get_folder_names(self.__path_sparta)
+        # self.__folder_names_sparta = get_folder_names(self.__path_sparta)
 
         self.__filename_contrast = 'ird_specal_dc-IRD_SPECAL_CONTRAST_CURVE_TABLE-contrast_curve_tab.fits'
         self.__filename_timestamps = 'ird_convert_recenter_dc5-IRD_TIMESTAMP-timestamp.fits'
-        self.__filename_sparta = 'ird_convert_recenter_dc5-SPH_SPARTA_SAMPLEDDATA-sampled_sparta_data.fits'
+        # self.__filename_sparta = 'ird_convert_recenter_dc5-SPH_SPARTA_SAMPLEDDATA-sampled_sparta_data.fits'
 
         folder_names_timestamps_split = [folder.split('_') for folder in self.__folder_names_timestamps]
-        folder_names_sparta_split = [folder.split('_') for folder in self.__folder_names_sparta]
+        # folder_names_sparta_split = [folder.split('_') for folder in self.__folder_names_sparta]
 
         # For each target name (*_split[:][0]) we want to replace '-' by ' '
         for i in range(len(folder_names_timestamps_split)):
             folder_names_timestamps_split[i][0] = folder_names_timestamps_split[i][0].replace('-', ' ')
 
-        for i in range(len(folder_names_sparta_split)):
-            folder_names_sparta_split[i][0] = folder_names_sparta_split[i][0].replace('-', ' ')
+        # for i in range(len(folder_names_sparta_split)):
+        #     folder_names_sparta_split[i][0] = folder_names_sparta_split[i][0].replace('-', ' ')
 
         # List of dictionnaries whose keys will be the same among all the dictionnaries.
         # It will then be converted into a dataframe.
@@ -354,7 +354,7 @@ class Dataset:
                         self.__missings[header].append(folder)
 
                 # Add the recovered version of OBS_STA and OBS_END
-                # 1. Match the folder name with the folder name in the timestamps and sparta folders
+                # 1. Match the folder name with the folder name in the timestamps (or sparta folders)
 
                 # Indicator of whether we find a matching folder name in the timestamps or not
                 # (based on target name and date and UTC).
