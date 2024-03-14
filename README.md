@@ -9,6 +9,9 @@
             <a href='#About-the-project'>About the project</a>
         </li>
         <li>
+            <a href='#Manuscript'>Manuscript</a>
+        </li>
+        <li>
         <a href="#Database-creation">Database creation</a>
             <ul>
                 <li><a href="#Prerequisites">Prerequisites</a>
@@ -39,6 +42,10 @@ Taking direct pictures of extrasolar planetary systems is an important, yet chal
 
 
 <!-- GETTING STARTED -->
+## Manuscript
+
+A detailed explanation of the whole project can be found in this [manuscript](http://hdl.handle.net/2268.2/19340).
+
 ## Dataset creation
 
 To get a local copy up and running follow these simple steps.
